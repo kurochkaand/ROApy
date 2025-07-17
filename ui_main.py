@@ -199,6 +199,16 @@ class MainWindow(QMainWindow):
 
     def on_export_separate(self):
         sel = self.get_selected_entries()
+        if not sel:
+            QMessageBox.warning(self, "Export Separate", "No spectra selected.")
+            return
+
+        # build list of checked modalities
+        mods = [m for m, on in self.get_modalities().items() if on]
+        if not mods:
+            QMessageBox.warning(self, "Export Separate", "No modalities selected.")
+            return
+
         out_dir = QFileDialog.getExistingDirectory(
             self, "Select Output Directory", self.working_dir
         )
@@ -206,9 +216,13 @@ class MainWindow(QMainWindow):
             return
 
         base = os.path.join(out_dir, sel[0]["name"])
-        export_separately(base, sel)
-        QMessageBox.information(self, "Export Separate",
-                                f"Separate spectra saved in:\n{out_dir}")
+        # pass the modalities list into exporter
+        export_separately(base, sel, mods)
+
+        QMessageBox.information(
+            self, "Export Separate",
+            f"Exported {len(sel)*len(mods)} files to:\n{out_dir}"
+        )
 
 
 if __name__ == "__main__":
