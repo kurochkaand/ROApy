@@ -216,12 +216,11 @@ class MainWindow(QMainWindow):
             return
 
         base = os.path.join(out_dir, sel[0]["name"])
-        # pass the modalities list into exporter
         export_separately(base, sel, mods)
 
         QMessageBox.information(
             self, "Export Separate",
-            f"Exported {len(sel)*len(mods)} files to:\n{out_dir}"
+            f"Exported {2*len(sel)*len(mods)} files (one Raman + one ROA per modality) to:\n{out_dir}"
         )
 
 
