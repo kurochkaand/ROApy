@@ -45,8 +45,9 @@ class MainWindow(QMainWindow):
         # now that range_start/range_end exist…
         self._update_range_bounds()
         self._connect_signals()
-        # initial plot + metadata
+        self._first_draw = True
         self.on_selection_changed()
+        self._first_draw = False
 
     def _init_ui(self):
         central = QWidget()
@@ -63,6 +64,7 @@ class MainWindow(QMainWindow):
         self.avg_cb   = QCheckBox("Average over range")
         self.range_start = QSpinBox()
         self.range_end   = QSpinBox()
+        self.last_cb.setChecked(True)
 
         grp_spec = QGroupBox("Spectra Selection")
         l_spec = QVBoxLayout()
@@ -147,9 +149,12 @@ class MainWindow(QMainWindow):
                     entries.append(avg)
             return entries
 
-        # default to "Last" if nothing chosen
-        if not cycles:
-            cycles = [max(by_cycle)]
+         # if the user hasn’t chosen First, Last or Average, return nothing
+        if not cycles and not self.avg_cb.isChecked():
+            if self._first_draw:
+                cycles = [max(by_cycle)]
+            else:
+                return []
 
         # collect A&B for each chosen cycle
         out = []
