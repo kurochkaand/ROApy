@@ -57,13 +57,13 @@ class MainWindow(QMainWindow):
         self.ui.exp_combo.clear()
         self.ui.exp_combo.addItems(names)
         if names:
-            default = max(self.data_entries, key=lambda e: e['cycle'])['name']
+            default = max(self.data_entries, key=lambda e: e['file_index'])['name']
             idx = names.index(default)
             self.ui.exp_combo.setCurrentIndex(idx)
 
     def _update_range_bounds(self):
         name = self.ui.exp_combo.currentText()
-        cycles = sorted({e['cycle'] for e in self.data_entries if e['name']==name})
+        cycles = sorted({e['file_index'] for e in self.data_entries if e['name']==name})
         if not cycles: return
         lo, hi = cycles[0], cycles[-1]
         for sb in (self.ui.range_start, self.ui.range_end):
@@ -76,7 +76,7 @@ class MainWindow(QMainWindow):
         entries = [e for e in self.data_entries if e['name']==name]
         by_cycle = {}
         for e in entries:
-            by_cycle.setdefault(e['cycle'], []).append(e)
+            by_cycle.setdefault(e['file_index'], []).append(e)
         cycles = []
         if self.ui.first_cb.isChecked(): cycles.append(min(by_cycle))
         if self.ui.last_cb.isChecked():  cycles.append(max(by_cycle))
@@ -85,7 +85,7 @@ class MainWindow(QMainWindow):
             sel = [c for c in by_cycle if lo <= c <= hi]
             out=[]
             for cam in ('A','B'):
-                avg = average_spectra([e for e in entries if e['camera']==cam and e['cycle'] in sel])
+                avg = average_spectra([e for e in entries if e['camera']==cam and e['file_index'] in sel])
                 if avg: out.append(avg)
             return out
         if not cycles and not self._first_draw:
@@ -122,11 +122,12 @@ class MainWindow(QMainWindow):
         self.plotter.update_plot(sel, mods)
         self.ui.meta_list.clear()
         for e in sel:
-            info=e['info']
+            info = e['info']
+            num_cycles = info.get("num_cycles", "N/A")
             self.ui.meta_list.addItem(
-                f"{e['name']} | Cam {e['camera']} | Cycle {e['cycle']}  "
-                f"Gain={info.get('gain')}  Power={info.get('power')}mW  "
-                f"Times={info.get('total_time')}"
+                f"{e['name']} | Cam {e['camera']} | File#{e['file_index']} | "
+                f"Cycles={num_cycles}  Gain={info.get('gain')}  "
+                f"Power={info.get('power')}mW  TotalTime={info.get('total_time')} s"
             )
 
     def on_export_combined(self):

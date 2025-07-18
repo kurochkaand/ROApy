@@ -31,7 +31,7 @@ class SpectraViewerUI:
         l_spec = QVBoxLayout()
         for w in (
             self.first_cb, self.last_cb, self.avg_cb,
-            QLabel("Cycle range:"), self.range_start, self.range_end
+            QLabel("Range of exported files:"), self.range_start, self.range_end
         ):
             l_spec.addWidget(w)
         grp_spec.setLayout(l_spec)

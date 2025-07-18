@@ -13,7 +13,7 @@ def parse_header(header_line: str):
         if "Power at sample" in part:
             info["power"] = int(re.search(r"Power at sample\s+(\d+)", part).group(1))
         if "Cycles" in part:
-            info["cycle"] = int(re.search(r"Cycles\s+(\d+)", part).group(1))
+            info["num_cycles"] = int(re.search(r"Cycles\s+(\d+)", part).group(1))
         if "Total times" in part:
             times = re.findall(r"([\d.]+)", part)
             info["total_time"] = list(map(float, times))
@@ -29,7 +29,7 @@ def load_data_files(directory):
         match = re.match(r"(.+)_([AB])-(\d+)_out\.txt", filename)
         if not match:
             continue
-        name, cam, cycle = match.groups()
+        name, cam, file_index = match.groups()
 
         with open(path, 'r') as f:
             header = f.readline()
@@ -43,7 +43,7 @@ def load_data_files(directory):
             data_entries.append({
                 "name": name,
                 "camera": cam,
-                "cycle": int(cycle),
+                "file_index": int(file_index),
                 "info": info,
                 "data": df,
                 "path": path

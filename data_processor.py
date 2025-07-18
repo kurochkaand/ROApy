@@ -43,5 +43,5 @@ def average_spectra(entries):
     # build a new entry dict (copy metadata from first one)
     avg = entries[0].copy()
     avg["data"] = mean_df
-    avg["cycle"] = f"{min(e['cycle'] for e in entries)}–{max(e['cycle'] for e in entries)}"
+    avg['file_index'] = f"{min(e['file_index'] for e in entries)}–{max(e['file_index'] for e in entries)}"
     return avg
