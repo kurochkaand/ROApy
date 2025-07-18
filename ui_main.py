@@ -103,7 +103,14 @@ class MainWindow(QMainWindow):
 
         # ── plot area ──
         self.plotter = SpectraPlotter(self)
-        main_l.addWidget(self.plotter.canvas, 2)
+        plot_container = QWidget()
+        plot_l = QVBoxLayout(plot_container)
+        plot_l.setContentsMargins(0, 0, 0, 0)
+        plot_l.addWidget(self.plotter.toolbar)
+        plot_l.addWidget(self.plotter.canvas)
+
+        main_l.addWidget(plot_container, 2)
+
 
     def _connect_signals(self):
         # rerun plot & metadata on any selection change

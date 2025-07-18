@@ -1,4 +1,7 @@
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import (
+    FigureCanvasQTAgg as FigureCanvas,
+    NavigationToolbar2QT as NavigationToolbar
+)
 from matplotlib.figure import Figure
 
 class SpectraPlotter:
@@ -6,6 +9,7 @@ class SpectraPlotter:
         # create figure with two rows, shared X
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
+        self.toolbar = NavigationToolbar(self.canvas, self.canvas)
         self.ax_raman = self.figure.add_subplot(211)
         self.ax_roa   = self.figure.add_subplot(212, sharex=self.ax_raman)
 
