@@ -1,3 +1,4 @@
+# ui.py
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QComboBox,
     QCheckBox, QGroupBox, QSpinBox, QPushButton, QListWidget

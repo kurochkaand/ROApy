@@ -1,3 +1,4 @@
+# plotter.py
 from matplotlib.backends.backend_qtagg import (
     FigureCanvasQTAgg as FigureCanvas,
     NavigationToolbar2QT as NavigationToolbar
@@ -28,18 +29,17 @@ class SpectraPlotter:
         # plot each trace into the appropriate axis
         for entry in spectra_entries:
             df = entry["data"]
-            prefix = f"{entry['name']} (Cam {entry['camera']})"
+            prefix = f"(Cam {entry['camera']})"
             for mod, (raman_col, roa_col) in modality_keys.items():
                 if modalities.get(mod):
                     # Raman on top
                     self.ax_raman.plot(
                         df["Wavenumber"], df[raman_col],
-                        label=f"{prefix} {mod} Raman"
+                        label=f"{prefix} {mod}"
                     )
                     # ROA on bottom
                     self.ax_roa.plot(
                         df["Wavenumber"], df[roa_col],
-                        label=f"{prefix} {mod} ROA"
                     )
 
         # annotate axes
@@ -54,8 +54,6 @@ class SpectraPlotter:
         # legends (only if there are lines)
         if self.ax_raman.lines:
             self.ax_raman.legend(loc="upper right", fontsize="small")
-        if self.ax_roa.lines:
-            self.ax_roa.legend(loc="upper right", fontsize="small")
 
         # tighten up spacing so labels don’t overlap
         self.figure.tight_layout()
