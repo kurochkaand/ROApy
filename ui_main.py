@@ -1,17 +1,15 @@
-# ui_main.py
+
 import os
 import sys
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFileDialog, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QCheckBox, QGroupBox, QSpinBox, QListWidget, QMessageBox
 )
-from PyQt6.QtCore import Qt
-
 from file_loader import load_data_files
 from plotter import SpectraPlotter
 from data_processor import merge_a_b, average_spectra
 from exporter import export_combined, export_separately
-
+from PyQt6.QtCore import QSettings
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -19,18 +17,22 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Spectra Viewer")
         self.resize(900, 600)
 
+        # ← Make sure all UI widgets exist
         self._init_ui()
 
-        # 1) ask for working directory
+        # settings, last dir, directory picker…
+        self.settings = QSettings("MyOrg", "SpectraViewer")
+        last = self.settings.value("lastWorkingDir", os.getcwd())
         self.working_dir = QFileDialog.getExistingDirectory(
-            self, "Select Working Directory", os.getcwd(),
+            self, "Select Working Directory", last,
             QFileDialog.Option.ShowDirsOnly
         )
         if not self.working_dir:
             self.close()
             return
+        self.settings.setValue("lastWorkingDir", self.working_dir)
 
-        # 2) load all *_out.txt
+        # load data entries…
         self.data_entries = load_data_files(self.working_dir)
         if not self.data_entries:
             QMessageBox.warning(
@@ -40,6 +42,7 @@ class MainWindow(QMainWindow):
             self.close()
             return
 
+        # now that range_start/range_end exist…
         self._update_range_bounds()
         self._connect_signals()
         # initial plot + metadata
