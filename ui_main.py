@@ -3,12 +3,13 @@ import os
 import sys
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFileDialog, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QCheckBox, QGroupBox, QSpinBox, QListWidget, QMessageBox
+    QPushButton, QLabel, QCheckBox, QGroupBox, QSpinBox, QListWidget, QMessageBox,
+    QComboBox
 )
-from file_loader import load_data_files
-from plotter import SpectraPlotter
+from file_loader    import load_data_files
+from plotter        import SpectraPlotter
 from data_processor import merge_a_b, average_spectra
-from exporter import export_combined, export_separately
+from exporter       import export_combined, export_separately
 from PyQt6.QtCore import QSettings
 
 class MainWindow(QMainWindow):
@@ -17,10 +18,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Spectra Viewer")
         self.resize(900, 600)
 
-        # ← Make sure all UI widgets exist
         self._init_ui()
 
-        # settings, last dir, directory picker…
         self.settings = QSettings("MyOrg", "SpectraViewer")
         last = self.settings.value("lastWorkingDir", os.getcwd())
         self.working_dir = QFileDialog.getExistingDirectory(
@@ -42,9 +41,10 @@ class MainWindow(QMainWindow):
             self.close()
             return
 
-        # now that range_start/range_end exist…
+        self._populate_experiment_combo()
         self._update_range_bounds()
         self._connect_signals()
+        self._update_range_bounds()
         self._first_draw = True
         self.on_selection_changed()
         self._first_draw = False
@@ -57,6 +57,10 @@ class MainWindow(QMainWindow):
         # ── control panel ──
         ctrl = QVBoxLayout()
         main_l.addLayout(ctrl, 1)
+
+        ctrl.addWidget(QLabel("Experiment"))
+        self.exp_combo = QComboBox()
+        ctrl.addWidget(self.exp_combo)
 
         # Spectra selection
         self.first_cb = QCheckBox("First")
@@ -111,50 +115,76 @@ class MainWindow(QMainWindow):
 
         main_l.addWidget(plot_container, 2)
 
+    def _populate_experiment_combo(self):
+        names = sorted({e["name"] for e in self.data_entries})
+        self.exp_combo.clear()
+        self.exp_combo.addItems(names)
+        if names:
+            max_entry = max(self.data_entries, key=lambda e: e["cycle"])
+            default = max_entry["name"]
+            idx = names.index(default)
+            self.exp_combo.setCurrentIndex(idx)
+
 
     def _connect_signals(self):
-        # rerun plot & metadata on any selection change
-        for cb in (self.first_cb, self.last_cb, self.avg_cb,
-                   self.mod_scp, self.mod_dcpi, self.mod_dcpii, self.mod_scpc):
-            cb.stateChanged.connect(self.on_selection_changed)
+        self.exp_combo.currentIndexChanged.connect(self._on_experiment_changed)
+
+        widgets = (
+            self.first_cb, self.last_cb, self.avg_cb,
+            self.mod_scp, self.mod_dcpi,
+            self.mod_dcpii, self.mod_scpc
+        )
+        for w in widgets:
+            w.stateChanged.connect(self.on_selection_changed)
         for sb in (self.range_start, self.range_end):
             sb.valueChanged.connect(self.on_selection_changed)
 
         self.btn_export_comb.clicked.connect(self.on_export_combined)
         self.btn_export_sep.clicked.connect(self.on_export_separate)
 
+    def _on_experiment_changed(self):
+        self._update_range_bounds()
+        self.on_selection_changed()
+
     def _update_range_bounds(self):
-        cycles = sorted({e["cycle"] for e in self.data_entries})
-        if cycles:
-            lo, hi = cycles[0], cycles[-1]
-            for sb in (self.range_start, self.range_end):
-                sb.setRange(lo, hi)
-            self.range_start.setValue(lo)
-            self.range_end.setValue(hi)
+        name = self.exp_combo.currentText()
+        cycles = sorted({
+            e["cycle"] for e in self.data_entries
+            if e["name"] == name
+        })
+        if not cycles:
+            return
+        lo, hi = cycles[0], cycles[-1]
+        for sb in (self.range_start, self.range_end):
+            sb.setRange(lo, hi)
+        self.range_start.setValue(lo)
+        self.range_end.setValue(hi)
 
     def get_selected_entries(self):
-        # group by cycle
+        # filter to the chosen experiment
+        name = self.exp_combo.currentText()
+        entries = [e for e in self.data_entries if e["name"] == name]
+
+        # then the rest of your logic stays the same, e.g.:
         by_cycle = {}
-        for e in self.data_entries:
+        for e in entries:
             by_cycle.setdefault(e["cycle"], []).append(e)
 
-        # determine which cycles
         cycles = []
         if self.first_cb.isChecked():
             cycles.append(min(by_cycle))
         if self.last_cb.isChecked():
             cycles.append(max(by_cycle))
-
         if self.avg_cb.isChecked():
             lo, hi = self.range_start.value(), self.range_end.value()
             sel = [c for c in by_cycle if lo <= c <= hi]
-            entries = []
-            for cam in ("A", "B"):
-                cams = [e for e in self.data_entries if e["camera"]==cam and e["cycle"] in sel]
-                avg = average_spectra(cams)
-                if avg:
-                    entries.append(avg)
-            return entries
+            out = []
+            for cam in ("A","B"):
+                subset = [e for e in entries
+                          if e["camera"]==cam and e["cycle"] in sel]
+                avg = average_spectra(subset)
+                if avg: out.append(avg)
+            return out
 
          # if the user hasn’t chosen First, Last or Average, return nothing
         if not cycles and not self.avg_cb.isChecked():
