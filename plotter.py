@@ -26,4 +26,5 @@ class SpectraPlotter:
         self.ax.set_xlabel("Wavenumber (1/cm)")
         self.ax.set_ylabel("Intensity")
         self.ax.legend()
+        self.canvas.figure.tight_layout()
         self.canvas.draw()
