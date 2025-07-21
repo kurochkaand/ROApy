@@ -40,6 +40,7 @@ def load_data_files(directory):
                 "DCPII Raman", "DCPII ROA",
                 "SCPc Raman", "SCPc ROA"
             ])
+            df = df.sort_values("Wavenumber", ascending=True).reset_index(drop=True)           
             data_entries.append({
                 "name": name,
                 "camera": cam,
