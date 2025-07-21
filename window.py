@@ -15,6 +15,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Spectra Viewer")
         self.resize(900, 600)
 
+        # Keep track of normalization state
+        self.normalized = False
+
         # Plotter instantiation
         self.plotter = SpectraPlotter(self)
 
@@ -107,6 +110,7 @@ class MainWindow(QMainWindow):
             sb.valueChanged.connect(self.on_selection_changed)
         ui.btn_export_comb.clicked.connect(self.on_export_combined)
         ui.btn_export_sep.clicked.connect(self.on_export_separate)
+        ui.btn_toggle_norm.clicked.connect(self.on_toggle_normalization)
 
     def _on_experiment_changed(self):
         self._update_range_bounds(); 
@@ -179,19 +183,15 @@ class MainWindow(QMainWindow):
         name = self.ui.exp_combo.currentText()
         if not name:
             return
-
         entries = [e for e in self.data_entries if e['name'] == name]
-
         modality_info = {
             'DCPI':  ('mod_dcpi',  "DCPI Raman",  "DCPI ROA"),
             'DCPII': ('mod_dcpii', "DCPII Raman", "DCPII ROA"),
             'SCPc':  ('mod_scpc',  "SCPc Raman",  "SCPc ROA")
         }
-
         for mod, (attr, r_col, o_col) in modality_info.items():
             cb: QCheckBox = getattr(self.ui, attr)
             present = False
-
             for e in entries:
                 df = e['data']
                 if len(df) > 0 and r_col in df.columns:
@@ -210,3 +210,48 @@ class MainWindow(QMainWindow):
             cb.setEnabled(present)
             if not present:
                 cb.setChecked(False)
+
+    def on_toggle_normalization(self):
+        """
+        Toggle normalization on/off and update button text.
+        """
+        self.normalized = not self.normalized
+        if self.normalized:
+            self.ui.btn_toggle_norm.setText("Undo normalization")
+        else:
+            self.ui.btn_toggle_norm.setText("Normalize by TotalTime")
+        self.on_selection_changed()
+
+    def on_selection_changed(self):
+        """
+        Gather selected entries, apply normalization if requested,
+        then plot and update metadata.
+        """
+        raw_sel = self.get_selected_entries()
+        if self.normalized:
+            sel = []
+            for e in raw_sel:
+                e_copy = e.copy()
+                df = e['data']
+                norm_df = df.copy()
+                total_time = e['info'].get('total_time', [1.0])
+                duration = float(total_time[0]) if isinstance(total_time, (list, tuple)) else float(total_time)
+                for col in norm_df.columns:
+                    if col != "Wavenumber":
+                        norm_df[col] = norm_df[col] / duration
+                e_copy['data'] = norm_df
+                sel.append(e_copy)
+        else:
+            sel = raw_sel
+        mods = self.get_modalities()
+        self.plotter.update_plot(sel, mods)
+        self.ui.meta_list.clear()
+        for e in raw_sel:
+            info = e['info']
+            num_cycles = info.get("num_cycles", "N/A")
+            t = info.get("total_time")
+            self.ui.meta_list.addItem(
+                f"{e['name']} | Cam {e['camera']} | File#{e['file_index']} | "
+                f"Cycles={num_cycles}  Gain={info.get('gain')}  "
+                f"Power={info.get('power')}mW  TotalTime={t} s"
+            )

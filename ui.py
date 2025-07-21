@@ -58,6 +58,10 @@ class SpectraViewerUI:
         ctrl.addWidget(self.btn_export_comb)
         ctrl.addWidget(self.btn_export_sep)
 
+        # Normalization toggle
+        self.btn_toggle_norm = QPushButton("Normalize by TotalTime")
+        ctrl.addWidget(self.btn_toggle_norm)
+
         ctrl.addWidget(QLabel("Metadata"))
         self.meta_list = QListWidget()
         ctrl.addWidget(self.meta_list)
