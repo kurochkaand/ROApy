@@ -2,7 +2,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QComboBox,
     QCheckBox, QGroupBox, QSpinBox, QPushButton, QListWidget,
-    QDoubleSpinBox, QRadioButton, QFormLayout
+    QDoubleSpinBox, QRadioButton, QFormLayout, QAbstractItemView,
 )
 
 class SpectraViewerUI:
@@ -37,6 +37,16 @@ class SpectraViewerUI:
             l_spec.addWidget(w)
         grp_spec.setLayout(l_spec)
         ctrl.addWidget(grp_spec)
+
+        # Individual‐spectrum selector ──
+        grp_list = QGroupBox("Spectra List")
+        l_list = QVBoxLayout()
+        self.indiv_list = QListWidget()
+        # allow ctrl+click or shift+drag multiple selection
+        self.indiv_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        l_list.addWidget(self.indiv_list)
+        grp_list.setLayout(l_list)
+        ctrl.addWidget(grp_list)
 
         # Modalities
         self.mod_scp   = QCheckBox("SCP")

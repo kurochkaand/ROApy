@@ -1,7 +1,7 @@
 # window.py
 import os
-from PyQt6.QtWidgets import QFileDialog, QMessageBox, QMainWindow, QCheckBox
-from PyQt6.QtCore import QSettings
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QMainWindow, QCheckBox, QListWidgetItem
+from PyQt6.QtCore import QSettings, Qt
 import math
 from ui import SpectraViewerUI
 from file_loader import load_data_files
@@ -50,6 +50,7 @@ class MainWindow(QMainWindow):
         self._populate_experiment_combo()
         self._update_range_bounds()
         self._update_modalities()
+        self._populate_individual_list()
         self._connect_signals()
 
         # First draw
@@ -66,6 +67,21 @@ class MainWindow(QMainWindow):
             idx = names.index(default)
             self.ui.exp_combo.setCurrentIndex(idx)
 
+    def _populate_individual_list(self):
+        """Fill the QListWidget with every (camera, cycle) entry for the current experiment."""
+        self.ui.indiv_list.clear()
+        name = self.ui.exp_combo.currentText()
+        # all entries for this experiment
+        entries = [e for e in self.data_entries if e['name'] == name]
+        # sort by cycle then camera
+        entries.sort(key=lambda e: (e['file_index'], e['camera']))
+        for e in entries:
+            text = f"Cycle {e['file_index']} | Cam {e['camera']}"
+            item = QListWidgetItem(text)
+            # stash the actual entry dict so we can grab it later
+            item.setData(Qt.ItemDataRole.UserRole, e)
+            self.ui.indiv_list.addItem(item)
+
     def _update_range_bounds(self):
         name = self.ui.exp_combo.currentText()
         cycles = sorted({e['file_index'] for e in self.data_entries if e['name']==name})
@@ -77,6 +93,10 @@ class MainWindow(QMainWindow):
         self.ui.range_end.setValue(hi)
 
     def get_selected_entries(self):
+        items = self.ui.indiv_list.selectedItems()
+        if items:
+            return [item.data(Qt.ItemDataRole.UserRole) for item in items]
+
         name = self.ui.exp_combo.currentText()
         entries = [e for e in self.data_entries if e['name']==name]
         by_cycle = {}
@@ -115,10 +135,12 @@ class MainWindow(QMainWindow):
         ui.btn_create_baseline.clicked.connect(self.on_create_baseline)
         ui.btn_subtract_created.clicked.connect(self.on_subtract_baseline)
         ui.btn_delete_baseline.clicked.connect(self.on_delete_baseline)
+        ui.indiv_list.itemSelectionChanged.connect(self.on_selection_changed)
 
     def _on_experiment_changed(self):
-        self._update_range_bounds(); 
-        self._update_modalities();
+        self._update_range_bounds()
+        self._update_modalities()
+        self._populate_individual_list()
         self.on_selection_changed()
 
     def get_modalities(self):
