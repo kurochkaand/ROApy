@@ -1,8 +1,8 @@
 # window.py
 import os
-from PyQt6.QtWidgets import QFileDialog, QMessageBox, QMainWindow
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QMainWindow, QCheckBox
 from PyQt6.QtCore import QSettings
-
+import math
 from ui import SpectraViewerUI
 from file_loader import load_data_files
 from plotter import SpectraPlotter
@@ -45,6 +45,7 @@ class MainWindow(QMainWindow):
         # Initial population & signals
         self._populate_experiment_combo()
         self._update_range_bounds()
+        self._update_modalities()
         self._connect_signals()
 
         # First draw
@@ -108,7 +109,9 @@ class MainWindow(QMainWindow):
         ui.btn_export_sep.clicked.connect(self.on_export_separate)
 
     def _on_experiment_changed(self):
-        self._update_range_bounds(); self.on_selection_changed()
+        self._update_range_bounds(); 
+        self._update_modalities();
+        self.on_selection_changed()
 
     def get_modalities(self):
         return {k:cb.isChecked() for k,cb in {
@@ -166,3 +169,44 @@ class MainWindow(QMainWindow):
             self,"Export Separate",
             f"Exported {2*len(sel)*len(mods)} files (…) to:\n{out_dir}"
         )
+
+    def _update_modalities(self):
+        """
+        Enable/disable each modality checkbox based on whether the FIRST
+        data point in that modality is non-zero—treating NaN or missing
+        as zero.
+        """
+        name = self.ui.exp_combo.currentText()
+        if not name:
+            return
+
+        entries = [e for e in self.data_entries if e['name'] == name]
+
+        modality_info = {
+            'DCPI':  ('mod_dcpi',  "DCPI Raman",  "DCPI ROA"),
+            'DCPII': ('mod_dcpii', "DCPII Raman", "DCPII ROA"),
+            'SCPc':  ('mod_scpc',  "SCPc Raman",  "SCPc ROA")
+        }
+
+        for mod, (attr, r_col, o_col) in modality_info.items():
+            cb: QCheckBox = getattr(self.ui, attr)
+            present = False
+
+            for e in entries:
+                df = e['data']
+                if len(df) > 0 and r_col in df.columns:
+                    r0 = df[r_col].iat[0]
+                    if math.isnan(r0): r0 = 0
+                else:
+                    r0 = 0
+                if len(df) > 0 and o_col in df.columns:
+                    o0 = df[o_col].iat[0]
+                    if math.isnan(o0): o0 = 0
+                else:
+                    o0 = 0
+                if r0 != 0 or o0 != 0:
+                    present = True
+                    break
+            cb.setEnabled(present)
+            if not present:
+                cb.setChecked(False)
