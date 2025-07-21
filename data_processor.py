@@ -65,7 +65,6 @@ def baseline_als(
     D = lam * (D @ D.T)
     w = np.ones(L)
     for i in range(niter):
-        print(i)
         W = diags(w, 0)
         Z = W + D
         # convert to CSC (or .tocsr()) to avoid SparseEfficiencyWarning
@@ -75,4 +74,3 @@ def baseline_als(
         if callback and redraw_each and (i % redraw_each == 0):
             callback(i, z)
     return z
-
