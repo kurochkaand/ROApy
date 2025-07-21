@@ -6,7 +6,7 @@ import math
 from ui import SpectraViewerUI
 from file_loader import load_data_files
 from plotter import SpectraPlotter
-from data_processor import merge_a_b, average_spectra
+from data_processor import merge_a_b, average_spectra, baseline_als
 from exporter import export_combined, export_separately
 
 class MainWindow(QMainWindow):
@@ -111,6 +111,7 @@ class MainWindow(QMainWindow):
         ui.btn_export_comb.clicked.connect(self.on_export_combined)
         ui.btn_export_sep.clicked.connect(self.on_export_separate)
         ui.btn_toggle_norm.clicked.connect(self.on_toggle_normalization)
+        ui.btn_remove_bg.clicked.connect(self.on_remove_background)
 
     def _on_experiment_changed(self):
         self._update_range_bounds(); 
@@ -255,3 +256,56 @@ class MainWindow(QMainWindow):
                 f"Cycles={num_cycles}  Gain={info.get('gain')}  "
                 f"Power={info.get('power')}mW  TotalTime={t} s"
             )
+            
+    def on_remove_background(self):
+         """Hook up the ALS baseline subtraction to the selected spectra."""
+         sel = self.get_selected_entries()
+         if not sel:
+             QMessageBox.warning(self, "Background Removal",
+                                 "No spectra selected.")
+             return
+
+         niter  = self.ui.max_iter_spin.value()
+         p      = self.ui.pressure_spin.value()
+         redraw = self.ui.redraw_spin.value()
+         from0  = self.ui.radio_zero.isChecked()
+
+         for entry in sel:
+             df = entry["data"]
+             new_df = df.copy()
+
+             # apply to every non‐Wavenumber column
+             for col in df.columns:
+                 if col == "Wavenumber":
+                     continue
+                 y = df[col].to_numpy()
+
+                 # Optional callback to preview baseline
+                 def preview_cb(it, baseline):
+                     # you could draw the baseline as a dotted line
+                     # on your plot here (omitted for brevity)
+                     pass
+
+                 baseline = baseline_als(
+                     y,
+                     lam=1e5,    # you could expose lam, too
+                     p=p,
+                     niter=niter,
+                     redraw_each=redraw,
+                     callback=(preview_cb if redraw else None)
+                 )
+
+                 if from0:
+                     new_df[col] = y - baseline
+                 else:
+                     # shift so baseline touches the minimum of original
+                     new_df[col] = df[col] - baseline + baseline.min()
+
+             entry["data"] = new_df
+
+         # re‐draw with background removed
+         self.on_selection_changed()
+         QMessageBox.information(
+             self, "Background Removal",
+             "Fluorescence baseline subtracted."
+         )

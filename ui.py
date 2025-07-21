@@ -1,7 +1,8 @@
 # ui.py
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QComboBox,
-    QCheckBox, QGroupBox, QSpinBox, QPushButton, QListWidget
+    QCheckBox, QGroupBox, QSpinBox, QPushButton, QListWidget,
+    QDoubleSpinBox, QRadioButton, QFormLayout
 )
 
 class SpectraViewerUI:
@@ -61,6 +62,42 @@ class SpectraViewerUI:
         # Normalization toggle
         self.btn_toggle_norm = QPushButton("Normalize by TotalTime")
         ctrl.addWidget(self.btn_toggle_norm)
+
+        # Fluorescence background removal
+        grp_bg = QGroupBox("Fluorescence Removal")
+        form = QFormLayout()
+
+        self.max_iter_spin = QSpinBox()
+        self.max_iter_spin.setRange(1, 1_000_000)
+        self.max_iter_spin.setValue(100_000)
+        form.addRow("Max iterations:", self.max_iter_spin)
+
+        self.pressure_spin = QDoubleSpinBox()
+        self.pressure_spin.setDecimals(8)
+        self.pressure_spin.setRange(0.0, 1.0)
+        self.pressure_spin.setSingleStep(1e-5)
+        self.pressure_spin.setValue(1e-5)
+        form.addRow("Pressure (p):", self.pressure_spin)
+
+        # baseline mode radio buttons
+        self.radio_zero     = QRadioButton("From zero")
+        self.radio_spectrum = QRadioButton("To spectrum")
+        self.radio_zero.setChecked(True)
+        h = QHBoxLayout()
+        h.addWidget(self.radio_zero)
+        h.addWidget(self.radio_spectrum)
+        form.addRow("Mode:", h)
+
+        self.redraw_spin = QSpinBox()
+        self.redraw_spin.setRange(1, 100_000)
+        self.redraw_spin.setValue(1_000)
+        form.addRow("Redraw every (iters):", self.redraw_spin)
+
+        self.btn_remove_bg = QPushButton("Remove Background")
+        form.addRow(self.btn_remove_bg)
+
+        grp_bg.setLayout(form)
+        ctrl.addWidget(grp_bg)
 
         ctrl.addWidget(QLabel("Metadata"))
         self.meta_list = QListWidget()
