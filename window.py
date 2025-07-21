@@ -265,41 +265,43 @@ class MainWindow(QMainWindow):
         if not sel:
             QMessageBox.warning(self, "Create Baseline", "No spectra selected.")
             return
-
+        mods = self.get_modalities()
         niter = self.ui.max_iter_spin.value()
         p     = self.ui.pressure_spin.value()
         start = self.ui.start_wav_spin.value()
         for e in sel:
             e.pop("baselines", None)
+        mod_to_col = {
+            'SCP':   'SCP Raman',
+            'DCPI':  'DCPI Raman',
+            'DCPII': 'DCPII Raman',
+            'SCPc':  'SCPc Raman'
+        }
         for entry in sel:
-            df = entry["data"]
-            x  = df["Wavenumber"].to_numpy()
-            # find first index ≥ start
+            df    = entry["data"]
+            x     = df["Wavenumber"].to_numpy()
             idx0 = np.searchsorted(x, start)
+            raman_cols = [
+                col
+                for mod, on in mods.items()
+                if on and (col := mod_to_col[mod]) in df.columns
+            ]
             bas_dict = {}
-
-            # only on Raman channels:
-            for col in df.columns:
-                if "Raman" not in col:
-                    continue
-                y = df[col].to_numpy()
+            for col in raman_cols:
+                y      = df[col].to_numpy()
                 y_tail = y[idx0:]
-                # run ALS on tail only
                 z_tail = baseline_als(
                     y_tail,
                     lam=1e5,
                     p=p,
                     niter=niter
                 )
-                # pad so full-length baseline
                 z = np.zeros_like(y)
                 z[idx0:] = z_tail
                 bas_dict[col] = z
 
             entry["baselines"] = bas_dict
-
-        # re-plot raw data + overlay baselines
-        self.plotter.update_plot(sel, self.get_modalities())
+        self.plotter.update_plot(sel, mods)
         for entry in sel:
             x = entry["data"]["Wavenumber"].to_numpy()
             for col, z in entry["baselines"].items():
@@ -309,7 +311,12 @@ class MainWindow(QMainWindow):
                     label=f"(Cam {entry['camera']}) {col} baseline"
                 )
         self.plotter.canvas.draw()
-        QMessageBox.information(self, "Create Baseline", "Baseline(s) created and overlaid.")
+
+        QMessageBox.information(
+            self, "Create Baseline",
+            "Baseline(s) created and overlaid."
+        )
+
 
     def on_subtract_baseline(self):
         """Subtract the previously created baseline from the spectra."""
