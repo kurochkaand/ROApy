@@ -38,12 +38,25 @@ class SpectraViewerUI:
         grp_spec.setLayout(l_spec)
         ctrl.addWidget(grp_spec)
 
-        # Individual‐spectrum selector ──
+        # Individual‐spectrum selector
         grp_list = QGroupBox("Spectra List")
         l_list = QVBoxLayout()
+
+        # Cam-A / Cam-B / Both radio row
+        row = QHBoxLayout()
+        self.radio_cam_a = QRadioButton("Cam. A")
+        self.radio_cam_b = QRadioButton("Cam. B")
+        self.radio_both  = QRadioButton("Both")
+        self.radio_both.setChecked(True)
+        for rb in (self.radio_cam_a, self.radio_cam_b, self.radio_both):
+            row.addWidget(rb)
+        l_list.addLayout(row)
+
         self.indiv_list = QListWidget()
-        # allow ctrl+click or shift+drag multiple selection
-        self.indiv_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        # allow multiple selection
+        self.indiv_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection
+        )
         l_list.addWidget(self.indiv_list)
         grp_list.setLayout(l_list)
         ctrl.addWidget(grp_list)

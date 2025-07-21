@@ -67,21 +67,6 @@ class MainWindow(QMainWindow):
             idx = names.index(default)
             self.ui.exp_combo.setCurrentIndex(idx)
 
-    def _populate_individual_list(self):
-        """Fill the QListWidget with every (camera, cycle) entry for the current experiment."""
-        self.ui.indiv_list.clear()
-        name = self.ui.exp_combo.currentText()
-        # all entries for this experiment
-        entries = [e for e in self.data_entries if e['name'] == name]
-        # sort by cycle then camera
-        entries.sort(key=lambda e: (e['file_index'], e['camera']))
-        for e in entries:
-            text = f"Cycle {e['file_index']} | Cam {e['camera']}"
-            item = QListWidgetItem(text)
-            # stash the actual entry dict so we can grab it later
-            item.setData(Qt.ItemDataRole.UserRole, e)
-            self.ui.indiv_list.addItem(item)
-
     def _update_range_bounds(self):
         name = self.ui.exp_combo.currentText()
         cycles = sorted({e['file_index'] for e in self.data_entries if e['name']==name})
@@ -95,7 +80,14 @@ class MainWindow(QMainWindow):
     def get_selected_entries(self):
         items = self.ui.indiv_list.selectedItems()
         if items:
-            return [item.data(Qt.ItemDataRole.UserRole) for item in items]
+            out = []
+            for it in items:
+                raw = it.data(Qt.ItemDataRole.UserRole)
+                if isinstance(raw, list):
+                    out.extend(raw)
+                else:
+                    out.append(raw)
+            return out
 
         name = self.ui.exp_combo.currentText()
         entries = [e for e in self.data_entries if e['name']==name]
@@ -127,6 +119,8 @@ class MainWindow(QMainWindow):
         for w in (ui.first_cb, ui.last_cb, ui.avg_cb,
                   ui.mod_scp, ui.mod_dcpi, ui.mod_dcpii, ui.mod_scpc):
             w.stateChanged.connect(self.on_selection_changed)
+        for rb in (ui.radio_cam_a, ui.radio_cam_b, ui.radio_both):
+            rb.toggled.connect(self._on_camera_mode_changed)            
         for sb in (ui.range_start, ui.range_end):
             sb.valueChanged.connect(self.on_selection_changed)
         ui.btn_export_comb.clicked.connect(self.on_export_combined)
@@ -375,3 +369,42 @@ class MainWindow(QMainWindow):
             e.pop("baselines", None)
         self.on_selection_changed()
         QMessageBox.information(self, "Delete Baseline", "Baselines cleared from the canvas.")
+
+    def _populate_individual_list(self):
+        """List only cycle numbers, filtered by Cam A/B/Both."""
+        self.ui.indiv_list.clear()
+        name = self.ui.exp_combo.currentText()
+        entries = [e for e in self.data_entries if e['name']==name]
+
+        # group by cycle → cameras
+        by_cycle = {}
+        for e in entries:
+            by_cycle.setdefault(e['file_index'], {})[e['camera']] = e
+
+        # decide mode
+        if self.ui.radio_cam_a.isChecked():
+            mode = 'A'
+        elif self.ui.radio_cam_b.isChecked():
+            mode = 'B'
+        else:
+            mode = 'Both'
+
+        for cycle in sorted(by_cycle):
+            cams = by_cycle[cycle]
+            if mode in ('A','B'):
+                if mode not in cams:
+                    continue
+                data = cams[mode]
+            else:  # Both
+                if 'A' not in cams or 'B' not in cams:
+                    continue
+                data = [cams['A'], cams['B']]
+
+            item = QListWidgetItem(f"Cycle {cycle}")
+            # store either a single entry or a list of two
+            item.setData(Qt.ItemDataRole.UserRole, data)
+            self.ui.indiv_list.addItem(item)
+
+    def _on_camera_mode_changed(self):
+        self._populate_individual_list()
+        self.on_selection_changed()
