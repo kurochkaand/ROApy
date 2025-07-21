@@ -97,7 +97,7 @@ class SpectraViewerUI:
 
         # new baseline‐related buttons
         self.btn_create_baseline       = QPushButton("Create Baseline")
-        self.btn_subtract_created      = QPushButton("Subtract Created Background")
+        self.btn_subtract_created      = QPushButton("Subtract Baseline")
         self.btn_delete_baseline       = QPushButton("Delete Baseline")
         form.addRow(self.btn_create_baseline)
         form.addRow(self.btn_subtract_created)
