@@ -8,14 +8,15 @@ from file_loader import load_data_files
 from plotter import SpectraPlotter
 from data_processor import merge_a_b, average_spectra, baseline_als
 from exporter import export_combined, export_separately
+import numpy as np
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Spectra Viewer")
-        self.resize(900, 600)
-
-        # Keep track of normalization state
+        self.resize(900, 900)
+        self.baselines = {}
         self.normalized = False
 
         # Plotter instantiation
@@ -111,7 +112,9 @@ class MainWindow(QMainWindow):
         ui.btn_export_comb.clicked.connect(self.on_export_combined)
         ui.btn_export_sep.clicked.connect(self.on_export_separate)
         ui.btn_toggle_norm.clicked.connect(self.on_toggle_normalization)
-        ui.btn_remove_bg.clicked.connect(self.on_remove_background)
+        ui.btn_create_baseline.clicked.connect(self.on_create_baseline)
+        ui.btn_subtract_created.clicked.connect(self.on_subtract_baseline)
+        ui.btn_delete_baseline.clicked.connect(self.on_delete_baseline)
 
     def _on_experiment_changed(self):
         self._update_range_bounds(); 
@@ -257,55 +260,89 @@ class MainWindow(QMainWindow):
                 f"Power={info.get('power')}mW  TotalTime={t} s"
             )
             
-    def on_remove_background(self):
-         """Hook up the ALS baseline subtraction to the selected spectra."""
-         sel = self.get_selected_entries()
-         if not sel:
-             QMessageBox.warning(self, "Background Removal",
-                                 "No spectra selected.")
-             return
+    def on_create_baseline(self):
+        sel = self.get_selected_entries()
+        if not sel:
+            QMessageBox.warning(self, "Create Baseline", "No spectra selected.")
+            return
 
-         niter  = self.ui.max_iter_spin.value()
-         p      = self.ui.pressure_spin.value()
-         redraw = self.ui.redraw_spin.value()
-         from0  = self.ui.radio_zero.isChecked()
+        niter = self.ui.max_iter_spin.value()
+        p     = self.ui.pressure_spin.value()
+        start = self.ui.start_wav_spin.value()
+        for e in sel:
+            e.pop("baselines", None)
+        for entry in sel:
+            df = entry["data"]
+            x  = df["Wavenumber"].to_numpy()
+            # find first index ≥ start
+            idx0 = np.searchsorted(x, start)
+            bas_dict = {}
 
-         for entry in sel:
-             df = entry["data"]
-             new_df = df.copy()
+            # only on Raman channels:
+            for col in df.columns:
+                if "Raman" not in col:
+                    continue
+                y = df[col].to_numpy()
+                y_tail = y[idx0:]
+                # run ALS on tail only
+                z_tail = baseline_als(
+                    y_tail,
+                    lam=1e5,
+                    p=p,
+                    niter=niter
+                )
+                # pad so full-length baseline
+                z = np.zeros_like(y)
+                z[idx0:] = z_tail
+                bas_dict[col] = z
 
-             # apply to every non‐Wavenumber column
-             for col in df.columns:
-                 if col == "Wavenumber":
-                     continue
-                 y = df[col].to_numpy()
+            entry["baselines"] = bas_dict
 
-                 # Optional callback to preview baseline
-                 def preview_cb(it, baseline):
-                     # you could draw the baseline as a dotted line
-                     # on your plot here (omitted for brevity)
-                     pass
+        # re-plot raw data + overlay baselines
+        self.plotter.update_plot(sel, self.get_modalities())
+        for entry in sel:
+            x = entry["data"]["Wavenumber"].to_numpy()
+            for col, z in entry["baselines"].items():
+                self.plotter.ax_raman.plot(
+                    x, z,
+                    linestyle="--",
+                    label=f"(Cam {entry['camera']}) {col} baseline"
+                )
+        self.plotter.canvas.draw()
+        QMessageBox.information(self, "Create Baseline", "Baseline(s) created and overlaid.")
 
-                 baseline = baseline_als(
-                     y,
-                     lam=1e5,    # you could expose lam, too
-                     p=p,
-                     niter=niter,
-                     redraw_each=redraw,
-                     callback=(preview_cb if redraw else None)
-                 )
+    def on_subtract_baseline(self):
+        """Subtract the previously created baseline from the spectra."""
+        sel = self.get_selected_entries()
+        if not sel:
+            QMessageBox.warning(self, "Subtract Background", "No spectra selected.")
+            return
 
-                 if from0:
-                     new_df[col] = y - baseline
-                 else:
-                     # shift so baseline touches the minimum of original
-                     new_df[col] = df[col] - baseline + baseline.min()
+        any_baseline = any("baselines" in e for e in sel)
+        if not any_baseline:
+            QMessageBox.warning(self, "Subtract Background", "No baselines found. Please 'Create Baseline' first.")
+            return
 
-             entry["data"] = new_df
+        from_zero = self.ui.radio_zero.isChecked()
 
-         # re‐draw with background removed
-         self.on_selection_changed()
-         QMessageBox.information(
-             self, "Background Removal",
-             "Fluorescence baseline subtracted."
-         )
+        for entry in sel:
+            df = entry["data"]
+            bas = entry.get("baselines", {})
+            for col, z in bas.items():
+                y = df[col].to_numpy()
+                if from_zero:
+                    new = y - z
+                else:
+                    new = y - z + z.min()
+                df[col] = new
+
+        # refresh the plot with the subtracted data
+        self.on_selection_changed()
+        QMessageBox.information(self, "Subtract Background", "Created baseline subtracted from spectra.")
+
+    def on_delete_baseline(self):
+        """Remove all baseline overlays (and cached baselines)."""
+        for e in self.data_entries:
+            e.pop("baselines", None)
+        self.on_selection_changed()
+        QMessageBox.information(self, "Delete Baseline", "Baselines cleared from the canvas.")

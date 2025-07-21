@@ -68,8 +68,8 @@ class SpectraViewerUI:
         form = QFormLayout()
 
         self.max_iter_spin = QSpinBox()
-        self.max_iter_spin.setRange(1, 1_000_000)
-        self.max_iter_spin.setValue(100_000)
+        self.max_iter_spin.setRange(1, 1_000)
+        self.max_iter_spin.setValue(100)
         form.addRow("Max iterations:", self.max_iter_spin)
 
         self.pressure_spin = QDoubleSpinBox()
@@ -88,14 +88,21 @@ class SpectraViewerUI:
         h.addWidget(self.radio_spectrum)
         form.addRow("Mode:", h)
 
-        self.redraw_spin = QSpinBox()
-        self.redraw_spin.setRange(1, 100_000)
-        self.redraw_spin.setValue(1_000)
-        form.addRow("Redraw every (iters):", self.redraw_spin)
+        # starting wavenumber for baseline
+        self.start_wav_spin = QDoubleSpinBox()
+        self.start_wav_spin.setRange(-50, 4000)
+        self.start_wav_spin.setValue(100.0)
+        self.start_wav_spin.setSuffix(" cm⁻¹")
+        form.addRow("Baseline start (cm⁻¹):", self.start_wav_spin)
 
-        self.btn_remove_bg = QPushButton("Remove Background")
-        form.addRow(self.btn_remove_bg)
-
+        # new baseline‐related buttons
+        self.btn_create_baseline       = QPushButton("Create Baseline")
+        self.btn_subtract_created      = QPushButton("Subtract Created Background")
+        self.btn_delete_baseline       = QPushButton("Delete Baseline")
+        form.addRow(self.btn_create_baseline)
+        form.addRow(self.btn_subtract_created)
+        form.addRow(self.btn_delete_baseline)
+        
         grp_bg.setLayout(form)
         ctrl.addWidget(grp_bg)
 
