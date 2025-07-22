@@ -18,7 +18,7 @@ def merge_a_b(a_df, b_df):
 def average_spectra(entries):
     """
     Given a list of entries (all same camera & same columns),
-    average their intensities point‐by‐point. Assumes same Wavenumber grid.
+    average their intensities point-by-point. Assumes same Wavenumber grid.
     """
     if not entries:
         return None

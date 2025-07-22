@@ -7,16 +7,15 @@ from ui import SpectraViewerUI
 from file_loader import load_data_files
 from plotter import SpectraPlotter
 from data_processor import merge_a_b, average_spectra, baseline_als
+from baseline_manager import BaselineManager, BaselineParams
 from exporter import export_combined, export_separately
-import numpy as np
-
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Spectra Viewer")
         self.resize(900, 900)
-        self.baselines: dict[str, dict[str, np.ndarray]] = {}
+        self.baseline_mgr = BaselineManager(self._uid_for_entry, baseline_als)
         self.normalized = False
 
         # Plotter instantiation
@@ -54,6 +53,19 @@ class MainWindow(QMainWindow):
         self._connect_signals()
 
         self.on_selection_changed()
+
+    def _plot_baselines(self, entries):
+        for entry in entries:
+            bas = entry.get("baselines", {})
+            if not bas:
+                continue
+            x = entry["data"]["Wavenumber"].to_numpy()
+            for col, z in bas.items():
+                self.plotter.ax_raman.plot(
+                    x, z, linestyle="--",
+                    label=f"(Cam {entry['camera']}) {col} baseline"
+                )
+        self.plotter.canvas.draw_idle()
 
     def _populate_experiment_combo(self):
         names = sorted({e['name'] for e in self.data_entries})
@@ -149,7 +161,7 @@ class MainWindow(QMainWindow):
         else:
             # real file spectrum
             base = f"FILE::{entry.get('path', id(entry))}"
-        norm_flag = "1" if entry.get('__norm__') or self.normalized else "0"
+        norm_flag = "1" if entry.get('__norm__', False) else "0"
         return f"{base}::norm={norm_flag}"
 
 
@@ -290,110 +302,48 @@ class MainWindow(QMainWindow):
             )
             
     def on_create_baseline(self):
-        # always operate on what is shown (avg/normalized)
         sel = self._current_work_selection()
         if not sel:
             QMessageBox.warning(self, "Create Baseline", "No spectra selected.")
             return
-        for e in sel:
-            e.pop("baselines", None)
-            self.baselines.pop(self._uid_for_entry(e), None)
+
+        params = BaselineParams(
+            lam=1e5,
+            p=self.ui.pressure_spin.value(),
+            niter=self.ui.max_iter_spin.value(),
+            start_wavenumber=self.ui.start_wav_spin.value()
+        )
         mods = self.get_modalities()
-        niter = self.ui.max_iter_spin.value()
-        p = self.ui.pressure_spin.value()
-        start = self.ui.start_wav_spin.value()
 
-        mod_to_col = {
-            'SCP': 'SCP Raman',
-            'DCPI': 'DCPI Raman',
-            'DCPII': 'DCPII Raman',
-            'SCPc': 'SCPc Raman'
-        }
+        self.baseline_mgr.create(sel, mods, params)
 
-        for entry in sel:
-            df = entry["data"]
-            x = df["Wavenumber"].to_numpy()
-            idx0 = np.searchsorted(x, start)
-            raman_cols = [
-                col
-                for mod, on in mods.items()
-                if on and (col := mod_to_col[mod]) in df.columns
-            ]
-            bas_dict = {}
-            for col in raman_cols:
-                y = df[col].to_numpy()
-                y_tail = y[idx0:]
-                z_tail = baseline_als(
-                    y_tail,
-                    lam=1e5,
-                    p=p,
-                    niter=niter
-                )
-                z = np.zeros_like(y)
-                z[idx0:] = z_tail
-                bas_dict[col] = z
-
-            # store both on the entry (for immediate use) and globally
-            entry["baselines"] = bas_dict
-            self.baselines[self._uid_for_entry(entry)] = bas_dict
-
-        # Update the plot with the new baselines
+        # replot spectra, then overlay baselines
         self.plotter.update_plot(sel, mods)
-        for entry in sel:
-            if "baselines" in entry:
-                x = entry["data"]["Wavenumber"].to_numpy()
-                for col, z in entry["baselines"].items():
-                    self.plotter.ax_raman.plot(
-                        x, z,
-                        linestyle="--",
-                        label=f"(Cam {entry['camera']}) {col} baseline"
-                    )
-        self.plotter.canvas.draw()
+        self._plot_baselines(sel)
 
         QMessageBox.information(self, "Create Baseline", "Baseline(s) created and overlaid.")
 
     def on_subtract_baseline(self):
-        """Subtract the previously created baseline from the spectra."""
-        # same processed selection that was used to create baselines
         sel = self._current_work_selection()
         if not sel:
             QMessageBox.warning(self, "Subtract Background", "No spectra selected.")
             return
 
-        # attach cached baselines if the entry lost them
-        for e in sel:
-            if "baselines" not in e:
-                cache = self.baselines.get(self._uid_for_entry(e))
-                if cache:
-                    e["baselines"] = cache
-
-        if not any("baselines" in e and e["baselines"] for e in sel):
+        if not self.baseline_mgr.has_any(sel):
             QMessageBox.warning(self, "Subtract Background", "No baselines found. Please 'Create Baseline' first.")
             return
 
-        from_zero = self.ui.radio_zero.isChecked()
-
-        for entry in sel:
-            df = entry["data"]
-            bas = entry.get("baselines", {})
-            for col, z in bas.items():
-                y = df[col].to_numpy()
-                new = (y - z) if from_zero else (y - z + z.min())
-                df[col] = new
-            # Update cache with “used” baseline (so re‑subtract won't fail)
-            self.baselines[self._uid_for_entry(entry)] = bas
-
-        # Refresh the plot with the subtracted data
+        self.baseline_mgr.subtract(sel, from_zero=self.ui.radio_zero.isChecked())
         self.on_selection_changed()
         QMessageBox.information(self, "Subtract Background", "Created baseline subtracted from spectra.")
 
     def on_delete_baseline(self):
-        """Remove all baseline overlays (and cached baselines)."""
+        self.baseline_mgr.clear()
         for e in self.data_entries:
             e.pop("baselines", None)
-        self.baselines.clear()
         self.on_selection_changed()
         QMessageBox.information(self, "Delete Baseline", "Baselines cleared from the canvas.")
+
 
     def _populate_individual_list(self):
         """List only cycle numbers, filtered by Cam A/B/Both."""
@@ -429,7 +379,7 @@ class MainWindow(QMainWindow):
             # store either a single entry or a list of two
             item.setData(Qt.ItemDataRole.UserRole, data)
             self.ui.indiv_list.addItem(item)
-        # ── Automatically select the last cycle in the list ──
+        # Automatically select the last cycle in the list
         self.ui.indiv_list.clearSelection()
         count = self.ui.indiv_list.count()
         if count > 0:
