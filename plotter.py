@@ -77,3 +77,16 @@ class SpectraPlotter:
 
         # schedule a redraw
         self.canvas.draw_idle()
+        
+    def draw_baselines(self, entries):
+        for e in entries:
+            bas = e.get("baselines") or {}
+            if not bas:
+                continue
+            x = e["data"]["Wavenumber"].to_numpy()
+            for col, z in bas.items():
+                self.ax_raman.plot(
+                    x, z, linestyle="--",
+                    label=f"(Cam {e['camera']}) {col} baseline"
+                )
+        self.canvas.draw_idle()

@@ -54,19 +54,6 @@ class MainWindow(QMainWindow):
 
         self.on_selection_changed()
 
-    def _plot_baselines(self, entries):
-        for entry in entries:
-            bas = entry.get("baselines", {})
-            if not bas:
-                continue
-            x = entry["data"]["Wavenumber"].to_numpy()
-            for col, z in bas.items():
-                self.plotter.ax_raman.plot(
-                    x, z, linestyle="--",
-                    label=f"(Cam {entry['camera']}) {col} baseline"
-                )
-        self.plotter.canvas.draw_idle()
-
     def _populate_experiment_combo(self):
         names = sorted({e['name'] for e in self.data_entries})
         self.ui.exp_combo.clear()
@@ -319,7 +306,7 @@ class MainWindow(QMainWindow):
 
         # replot spectra, then overlay baselines
         self.plotter.update_plot(sel, mods)
-        self._plot_baselines(sel)
+        self.plotter.draw_baselines(sel)
 
         QMessageBox.information(self, "Create Baseline", "Baseline(s) created and overlaid.")
 
