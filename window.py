@@ -16,7 +16,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Spectra Viewer")
         self.resize(900, 900)
-        self.baselines = {}
+        self.baselines: dict[str, dict[str, np.ndarray]] = {}
         self.normalized = False
 
         # Plotter instantiation
@@ -53,10 +53,7 @@ class MainWindow(QMainWindow):
         self._populate_individual_list()
         self._connect_signals()
 
-        # First draw
-        self._first_draw = True
         self.on_selection_changed()
-        self._first_draw = False
 
     def _populate_experiment_combo(self):
         names = sorted({e['name'] for e in self.data_entries})
@@ -78,46 +75,89 @@ class MainWindow(QMainWindow):
         self.ui.range_end.setValue(hi)
 
     def get_selected_entries(self):
-        items = self.ui.indiv_list.selectedItems()
-        if items:
+        # If “Average over range” is requested, build the averaged spectra
+        if self.ui.avg_cb.isChecked():
+            name = self.ui.exp_combo.currentText()
+            entries = [e for e in self.data_entries if e['name'] == name]
+            lo, hi = self.ui.range_start.value(), self.ui.range_end.value()
+
             out = []
-            for it in items:
-                raw = it.data(Qt.ItemDataRole.UserRole)
-                if isinstance(raw, list):
-                    out.extend(raw)
-                else:
-                    out.append(raw)
+            for cam in ('A', 'B'):
+                cam_entries = [
+                    e for e in entries
+                    if e['camera'] == cam and lo <= e['file_index'] <= hi
+                ]
+                avg = average_spectra(cam_entries)
+                if avg:
+                    # tag averaged dict so we can build a stable key for it
+                    avg['__kind__'] = 'avg'
+                    avg['camera'] = cam
+                    avg['name'] = name
+                    avg['range'] = (lo, hi)
+                    out.append(avg)
             return out
 
-        name = self.ui.exp_combo.currentText()
-        entries = [e for e in self.data_entries if e['name']==name]
-        by_cycle = {}
+        # Otherwise use explicit selection in the list
+        items = self.ui.indiv_list.selectedItems()
+        if not items and self.ui.indiv_list.count() > 0:
+            # Auto-select last row if nothing is selected
+            last_row = self.ui.indiv_list.count() - 1
+            self.ui.indiv_list.setCurrentRow(last_row)
+            items = [self.ui.indiv_list.item(last_row)]
+
+        selected = []
+        for it in items:
+            raw = it.data(Qt.ItemDataRole.UserRole)
+            if isinstance(raw, list):
+                selected.extend(raw)
+            else:
+                selected.append(raw)
+        return selected
+
+    def _normalize_copy(self, entries):
+        """Return a NEW list of entries with data normalized if needed."""
+        if not self.normalized:
+            return entries
+        out = []
         for e in entries:
-            by_cycle.setdefault(e['file_index'], []).append(e)
-        cycles = []
-        if self.ui.first_cb.isChecked(): cycles.append(min(by_cycle))
-        if self.ui.last_cb.isChecked():  cycles.append(max(by_cycle))
-        if self.ui.avg_cb.isChecked():
-            lo, hi = self.ui.range_start.value(), self.ui.range_end.value()
-            sel = [c for c in by_cycle if lo <= c <= hi]
-            out=[]
-            for cam in ('A','B'):
-                avg = average_spectra([e for e in entries if e['camera']==cam and e['file_index'] in sel])
-                if avg: out.append(avg)
-            return out
-        if not cycles and not self._first_draw:
-            return []
-        if not cycles:
-            cycles=[max(by_cycle)]
-        out=[]
-        for c in sorted(cycles): out+=by_cycle[c]
+            e2 = e.copy()
+            df = e['data']
+            norm_df = df.copy()
+            total_time = e['info'].get('total_time', [1.0])
+            duration = float(total_time[0]) if isinstance(total_time, (list, tuple)) else float(total_time)
+            for col in norm_df.columns:
+                if col != "Wavenumber":
+                    norm_df[col] = norm_df[col] / duration
+            e2['data'] = norm_df
+            # mark the copy so the UID reflects normalization
+            e2['__norm__'] = True
+            out.append(e2)
         return out
+    
+    def _current_work_selection(self):
+        """Selection as it is *processed* (avg + normalization)."""
+        raw = self.get_selected_entries()
+        return self._normalize_copy(raw)
+
+    def _uid_for_entry(self, entry):
+        """
+        Build a stable key for a spectrum (file or averaged) including normalization state.
+        """
+        if entry.get('__kind__') == 'avg':
+            lo, hi = entry['range']
+            base = f"AVG::{entry['name']}::{entry['camera']}::{lo}-{hi}"
+        else:
+            # real file spectrum
+            base = f"FILE::{entry.get('path', id(entry))}"
+        norm_flag = "1" if entry.get('__norm__') or self.normalized else "0"
+        return f"{base}::norm={norm_flag}"
+
 
     def _connect_signals(self):
         ui = self.ui
         ui.exp_combo.currentIndexChanged.connect(self._on_experiment_changed)
-        for w in (ui.first_cb, ui.last_cb, ui.avg_cb,
-                  ui.mod_scp, ui.mod_dcpi, ui.mod_dcpii, ui.mod_scpc):
+        ui.avg_cb.stateChanged.connect(self.on_selection_changed)
+        for w in (ui.mod_scp, ui.mod_dcpi, ui.mod_dcpii, ui.mod_scpc):
             w.stateChanged.connect(self.on_selection_changed)
         for rb in (ui.radio_cam_a, ui.radio_cam_b, ui.radio_both):
             rb.toggled.connect(self._on_camera_mode_changed)            
@@ -142,20 +182,6 @@ class MainWindow(QMainWindow):
             'SCP': self.ui.mod_scp, 'DCPI': self.ui.mod_dcpi,
             'DCPII': self.ui.mod_dcpii, 'SCPc': self.ui.mod_scpc
         }.items()}
-
-    def on_selection_changed(self):
-        sel  = self.get_selected_entries()
-        mods = self.get_modalities()
-        self.plotter.update_plot(sel, mods)
-        self.ui.meta_list.clear()
-        for e in sel:
-            info = e['info']
-            num_cycles = info.get("num_cycles", "N/A")
-            self.ui.meta_list.addItem(
-                f"{e['name']} | Cam {e['camera']} | File#{e['file_index']} | "
-                f"Cycles={num_cycles}  Gain={info.get('gain')}  "
-                f"Power={info.get('power')}mW  TotalTime={info.get('total_time')} s"
-            )
 
     def on_export_combined(self):
         sel=self.get_selected_entries()
@@ -248,21 +274,8 @@ class MainWindow(QMainWindow):
         then plot and update metadata.
         """
         raw_sel = self.get_selected_entries()
-        if self.normalized:
-            sel = []
-            for e in raw_sel:
-                e_copy = e.copy()
-                df = e['data']
-                norm_df = df.copy()
-                total_time = e['info'].get('total_time', [1.0])
-                duration = float(total_time[0]) if isinstance(total_time, (list, tuple)) else float(total_time)
-                for col in norm_df.columns:
-                    if col != "Wavenumber":
-                        norm_df[col] = norm_df[col] / duration
-                e_copy['data'] = norm_df
-                sel.append(e_copy)
-        else:
-            sel = raw_sel
+        sel = self._normalize_copy(raw_sel)
+
         mods = self.get_modalities()
         self.plotter.update_plot(sel, mods)
         self.ui.meta_list.clear()
@@ -277,25 +290,29 @@ class MainWindow(QMainWindow):
             )
             
     def on_create_baseline(self):
-        sel = self.get_selected_entries()
+        # always operate on what is shown (avg/normalized)
+        sel = self._current_work_selection()
         if not sel:
             QMessageBox.warning(self, "Create Baseline", "No spectra selected.")
             return
-        mods = self.get_modalities()
-        niter = self.ui.max_iter_spin.value()
-        p     = self.ui.pressure_spin.value()
-        start = self.ui.start_wav_spin.value()
         for e in sel:
             e.pop("baselines", None)
+            self.baselines.pop(self._uid_for_entry(e), None)
+        mods = self.get_modalities()
+        niter = self.ui.max_iter_spin.value()
+        p = self.ui.pressure_spin.value()
+        start = self.ui.start_wav_spin.value()
+
         mod_to_col = {
-            'SCP':   'SCP Raman',
-            'DCPI':  'DCPI Raman',
+            'SCP': 'SCP Raman',
+            'DCPI': 'DCPI Raman',
             'DCPII': 'DCPII Raman',
-            'SCPc':  'SCPc Raman'
+            'SCPc': 'SCPc Raman'
         }
+
         for entry in sel:
-            df    = entry["data"]
-            x     = df["Wavenumber"].to_numpy()
+            df = entry["data"]
+            x = df["Wavenumber"].to_numpy()
             idx0 = np.searchsorted(x, start)
             raman_cols = [
                 col
@@ -304,7 +321,7 @@ class MainWindow(QMainWindow):
             ]
             bas_dict = {}
             for col in raman_cols:
-                y      = df[col].to_numpy()
+                y = df[col].to_numpy()
                 y_tail = y[idx0:]
                 z_tail = baseline_als(
                     y_tail,
@@ -316,33 +333,41 @@ class MainWindow(QMainWindow):
                 z[idx0:] = z_tail
                 bas_dict[col] = z
 
+            # store both on the entry (for immediate use) and globally
             entry["baselines"] = bas_dict
+            self.baselines[self._uid_for_entry(entry)] = bas_dict
+
+        # Update the plot with the new baselines
         self.plotter.update_plot(sel, mods)
         for entry in sel:
-            x = entry["data"]["Wavenumber"].to_numpy()
-            for col, z in entry["baselines"].items():
-                self.plotter.ax_raman.plot(
-                    x, z,
-                    linestyle="--",
-                    label=f"(Cam {entry['camera']}) {col} baseline"
-                )
+            if "baselines" in entry:
+                x = entry["data"]["Wavenumber"].to_numpy()
+                for col, z in entry["baselines"].items():
+                    self.plotter.ax_raman.plot(
+                        x, z,
+                        linestyle="--",
+                        label=f"(Cam {entry['camera']}) {col} baseline"
+                    )
         self.plotter.canvas.draw()
 
-        QMessageBox.information(
-            self, "Create Baseline",
-            "Baseline(s) created and overlaid."
-        )
-
+        QMessageBox.information(self, "Create Baseline", "Baseline(s) created and overlaid.")
 
     def on_subtract_baseline(self):
         """Subtract the previously created baseline from the spectra."""
-        sel = self.get_selected_entries()
+        # same processed selection that was used to create baselines
+        sel = self._current_work_selection()
         if not sel:
             QMessageBox.warning(self, "Subtract Background", "No spectra selected.")
             return
 
-        any_baseline = any("baselines" in e for e in sel)
-        if not any_baseline:
+        # attach cached baselines if the entry lost them
+        for e in sel:
+            if "baselines" not in e:
+                cache = self.baselines.get(self._uid_for_entry(e))
+                if cache:
+                    e["baselines"] = cache
+
+        if not any("baselines" in e and e["baselines"] for e in sel):
             QMessageBox.warning(self, "Subtract Background", "No baselines found. Please 'Create Baseline' first.")
             return
 
@@ -353,13 +378,12 @@ class MainWindow(QMainWindow):
             bas = entry.get("baselines", {})
             for col, z in bas.items():
                 y = df[col].to_numpy()
-                if from_zero:
-                    new = y - z
-                else:
-                    new = y - z + z.min()
+                new = (y - z) if from_zero else (y - z + z.min())
                 df[col] = new
+            # Update cache with “used” baseline (so re‑subtract won't fail)
+            self.baselines[self._uid_for_entry(entry)] = bas
 
-        # refresh the plot with the subtracted data
+        # Refresh the plot with the subtracted data
         self.on_selection_changed()
         QMessageBox.information(self, "Subtract Background", "Created baseline subtracted from spectra.")
 
@@ -367,6 +391,7 @@ class MainWindow(QMainWindow):
         """Remove all baseline overlays (and cached baselines)."""
         for e in self.data_entries:
             e.pop("baselines", None)
+        self.baselines.clear()
         self.on_selection_changed()
         QMessageBox.information(self, "Delete Baseline", "Baselines cleared from the canvas.")
 
@@ -404,6 +429,14 @@ class MainWindow(QMainWindow):
             # store either a single entry or a list of two
             item.setData(Qt.ItemDataRole.UserRole, data)
             self.ui.indiv_list.addItem(item)
+        # ── Automatically select the last cycle in the list ──
+        self.ui.indiv_list.clearSelection()
+        count = self.ui.indiv_list.count()
+        if count > 0:
+            last_item = self.ui.indiv_list.item(count - 1)
+            last_item.setSelected(True)
+        if count:
+            self.ui.indiv_list.setCurrentRow(count - 1)
 
     def _on_camera_mode_changed(self):
         self._populate_individual_list()

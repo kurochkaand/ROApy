@@ -20,27 +20,14 @@ class SpectraViewerUI:
         self.exp_combo = QComboBox()
         ctrl.addWidget(self.exp_combo)
 
-        # Spectra selection
-        self.first_cb = QCheckBox("First")
-        self.last_cb  = QCheckBox("Last")
-        self.avg_cb   = QCheckBox("Average over range")
-        self.range_start = QSpinBox()
-        self.range_end   = QSpinBox()
-        self.last_cb.setChecked(True)
-
-        grp_spec = QGroupBox("Spectra Selection")
-        l_spec = QVBoxLayout()
-        for w in (
-            self.first_cb, self.last_cb, self.avg_cb,
-            QLabel("Range of exported files:"), self.range_start, self.range_end
-        ):
-            l_spec.addWidget(w)
-        grp_spec.setLayout(l_spec)
-        ctrl.addWidget(grp_spec)
-
         # Individual‐spectrum selector
         grp_list = QGroupBox("Spectra List")
         l_list = QVBoxLayout()
+
+        # Average selection
+        self.avg_cb   = QCheckBox("Average over range")
+        self.range_start = QSpinBox()
+        self.range_end   = QSpinBox()
 
         # Cam-A / Cam-B / Both radio row
         row = QHBoxLayout()
@@ -58,6 +45,10 @@ class SpectraViewerUI:
             QAbstractItemView.SelectionMode.ExtendedSelection
         )
         l_list.addWidget(self.indiv_list)
+        l_list.addWidget(self.avg_cb)
+        l_list.addWidget(QLabel("Range of exported files:"))
+        l_list.addWidget(self.range_start)
+        l_list.addWidget(self.range_end)
         grp_list.setLayout(l_list)
         ctrl.addWidget(grp_list)
 
