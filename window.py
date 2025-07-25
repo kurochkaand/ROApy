@@ -290,7 +290,26 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Subtract Background", "No baselines found. Please 'Create Baseline' first.")
             return
 
-        self.baseline_mgr.subtract(sel, from_zero=self.ui.radio_zero.isChecked())
+        new_entries = []
+        for e in sel:
+            # Deep copy the spectrum entry (so we don't change the original)
+            import copy
+            new_entry = copy.deepcopy(e)
+            # Actually subtract the baseline on the copy
+            self.baseline_mgr.subtract([new_entry], from_zero=self.ui.radio_zero.isChecked())
+            # Modify the name/file_index to indicate baseline-corrected
+            old_name = new_entry.get('name', '')
+            old_index = new_entry.get('file_index', '')
+            new_entry['name'] = old_name
+            new_entry['file_index'] = f"{old_index}_blcorr"
+            # Optionally: add a tag in metadata
+            new_entry['info'] = dict(new_entry['info'])  # make a shallow copy if needed
+            new_entry['info']['baseline_corrected'] = True
+            new_entries.append(new_entry)
+
+        # Insert new entries
+        self.data_entries.extend(new_entries)
+        self._populate_individual_list()
         self.on_selection_changed()
         QMessageBox.information(self, "Subtract Background", "Created baseline subtracted from spectra.")
 
