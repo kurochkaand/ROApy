@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+import pandas as pd
 
 class SelectionOfCyclesWindow(QWidget):
     def __init__(self, main_window):
@@ -158,10 +159,26 @@ class SelectionOfCyclesWindow(QWidget):
             QMessageBox.warning(self, "No selection", "Please select at least one cycle.")
             return
 
+        # Get the first real cycle's metadata
+        first_cycle = self.sorted_cycles[0]
+        first_entry = self.cycles[first_cycle].get('A') or self.cycles[first_cycle].get('B')
+        first_info = first_entry['info']
+        # Compute new metadata
+        n_sel = len(selected)
+        cycles_per_file = first_info.get('num_cycles', 1)
+        gain = first_info.get('gain', None)
+        power = first_info.get('power', None)
+        total_time_per_file = 0
+        tt = first_info.get('total_time', 0)
+        if isinstance(tt, (list, tuple)):
+            total_time_per_file = sum(tt)
+        else:
+            total_time_per_file = float(tt) if tt is not None else 0
+
+
         # Prepare metadata and Δ data lists
         gains, powers, times = [], [], []
         deltas_A, deltas_B = [], []
-        import pandas as pd
         for cycle in selected:
             for cam, container in (('A', deltas_A), ('B', deltas_B)):
                 entry = self.cycles[cycle].get(cam)
@@ -202,10 +219,10 @@ class SelectionOfCyclesWindow(QWidget):
         # Build new spectrum entries
         name = self.main_window.ui.exp_combo.currentText()
         meta = {
-            'Cycles': len(selected),
-            'Gain': sum(gains) / len(gains),
-            'Power': sum(powers) / len(powers),
-            'TotalTime': sum(times),
+            'num_cycles': cycles_per_file * n_sel,
+            'gain': gain,
+            'power': power,
+            'total_time': [total_time_per_file * n_sel],
         }
         new_entries = []
         cycles_str = ",".join(str(c) for c in selected)
