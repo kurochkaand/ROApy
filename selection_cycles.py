@@ -23,7 +23,8 @@ class SelectionOfCyclesWindow(QWidget):
             cam = e['camera']
             self.cycles.setdefault(idx, {})[cam] = e
         self.sorted_cycles = sorted(self.cycles.keys(), key=lambda x: (isinstance(x, str), x))
-
+        real_cycle_keys = [k for k in self.cycles.keys() if isinstance(k, int)]
+        self.sorted_cycles = sorted(real_cycle_keys)
         # Map each cycle to its previous cycle (for Δ calculation)
         self.prev_cycle = {
             cycle: (self.sorted_cycles[i-1] if i > 0 else None)
