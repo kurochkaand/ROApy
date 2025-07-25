@@ -207,11 +207,12 @@ class SelectionOfCyclesWindow(QWidget):
             'TotalTime': sum(times),
         }
         new_entries = []
+        cycles_str = ",".join(str(c) for c in selected)
         for cam, df in (('A', sum_A), ('B', sum_B)):
             new_entries.append({
                 'name': name,
                 'camera': cam,
-                'file_index': f"sum_{min(selected)}–{max(selected)}",
+                'file_index': f"sum_{cycles_str}",
                 'info': meta,
                 'data': df,
                 'path': None,
