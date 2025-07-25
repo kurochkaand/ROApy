@@ -1,6 +1,7 @@
 # window.py
 import os
-from PyQt6.QtWidgets import QFileDialog, QMessageBox, QMainWindow, QCheckBox, QListWidgetItem
+from PyQt6.QtWidgets import QToolBar, QFileDialog, QMessageBox, QMainWindow, QCheckBox, QListWidgetItem
+from PyQt6.QtGui import QAction
 from PyQt6.QtCore import QSettings, Qt
 import math
 from ui import SpectraViewerUI
@@ -9,6 +10,7 @@ from plotter import SpectraPlotter
 from data_processor import merge_a_b, average_spectra, baseline_als
 from baseline_manager import BaselineManager, BaselineParams
 from exporter import export_combined, export_separately
+from selection_cycles import SelectionOfCyclesWindow
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -17,6 +19,11 @@ class MainWindow(QMainWindow):
         self.resize(900, 900)
         self.baseline_mgr = BaselineManager(self._uid_for_entry, baseline_als)
         self.normalized = False
+        self.main_toolbar = QToolBar("Main")
+        self.addToolBar(self.main_toolbar)
+        self.select_cycles_action = QAction("Create selection of measurement cycles", self)
+        self.main_toolbar.addAction(self.select_cycles_action)
+        self.select_cycles_action.triggered.connect(self.open_selection_window)
 
         # Plotter instantiation
         self.plotter = SpectraPlotter(self)
@@ -47,7 +54,6 @@ class MainWindow(QMainWindow):
 
         # Initial population & signals
         self._populate_experiment_combo()
-        self._update_range_bounds()
         self._update_modalities()
         self._populate_individual_list()
         self._connect_signals()
@@ -63,39 +69,7 @@ class MainWindow(QMainWindow):
             idx = names.index(default)
             self.ui.exp_combo.setCurrentIndex(idx)
 
-    def _update_range_bounds(self):
-        name = self.ui.exp_combo.currentText()
-        cycles = sorted({e['file_index'] for e in self.data_entries if e['name']==name})
-        if not cycles: return
-        lo, hi = cycles[0], cycles[-1]
-        for sb in (self.ui.range_start, self.ui.range_end):
-            sb.setRange(lo, hi)
-        self.ui.range_start.setValue(lo)
-        self.ui.range_end.setValue(hi)
-
     def get_selected_entries(self):
-        # If “Average over range” is requested, build the averaged spectra
-        if self.ui.avg_cb.isChecked():
-            name = self.ui.exp_combo.currentText()
-            entries = [e for e in self.data_entries if e['name'] == name]
-            lo, hi = self.ui.range_start.value(), self.ui.range_end.value()
-
-            out = []
-            for cam in ('A', 'B'):
-                cam_entries = [
-                    e for e in entries
-                    if e['camera'] == cam and lo <= e['file_index'] <= hi
-                ]
-                avg = average_spectra(cam_entries)
-                if avg:
-                    # tag averaged dict so we can build a stable key for it
-                    avg['__kind__'] = 'avg'
-                    avg['camera'] = cam
-                    avg['name'] = name
-                    avg['range'] = (lo, hi)
-                    out.append(avg)
-            return out
-
         # Otherwise use explicit selection in the list
         items = self.ui.indiv_list.selectedItems()
         if not items and self.ui.indiv_list.count() > 0:
@@ -155,13 +129,10 @@ class MainWindow(QMainWindow):
     def _connect_signals(self):
         ui = self.ui
         ui.exp_combo.currentIndexChanged.connect(self._on_experiment_changed)
-        ui.avg_cb.stateChanged.connect(self.on_selection_changed)
         for w in (ui.mod_scp, ui.mod_dcpi, ui.mod_dcpii, ui.mod_scpc):
             w.stateChanged.connect(self.on_selection_changed)
         for rb in (ui.radio_cam_a, ui.radio_cam_b, ui.radio_both):
             rb.toggled.connect(self._on_camera_mode_changed)            
-        for sb in (ui.range_start, ui.range_end):
-            sb.valueChanged.connect(self.on_selection_changed)
         ui.btn_export_comb.clicked.connect(self.on_export_combined)
         ui.btn_export_sep.clicked.connect(self.on_export_separate)
         ui.btn_toggle_norm.clicked.connect(self.on_toggle_normalization)
@@ -171,7 +142,6 @@ class MainWindow(QMainWindow):
         ui.indiv_list.itemSelectionChanged.connect(self.on_selection_changed)
 
     def _on_experiment_changed(self):
-        self._update_range_bounds()
         self._update_modalities()
         self._populate_individual_list()
         self.on_selection_changed()
@@ -351,7 +321,10 @@ class MainWindow(QMainWindow):
         else:
             mode = 'Both'
 
-        for cycle in sorted(by_cycle):
+        def cycle_sort_key(c):
+            # ints sort before strings, and ints sort numerically
+            return (isinstance(c, str), c)
+        for cycle in sorted(by_cycle, key=cycle_sort_key):
             cams = by_cycle[cycle]
             if mode in ('A','B'):
                 if mode not in cams:
@@ -376,5 +349,20 @@ class MainWindow(QMainWindow):
             self.ui.indiv_list.setCurrentRow(count - 1)
 
     def _on_camera_mode_changed(self):
+        self._populate_individual_list()
+        self.on_selection_changed()
+
+    def open_selection_window(self):
+        # avoid opening duplicates
+        if hasattr(self, 'selection_window') and self.selection_window.isVisible():
+            self.selection_window.raise_()
+            self.selection_window.activateWindow()
+        else:
+            self.selection_window = SelectionOfCyclesWindow(self)
+            self.selection_window.show()
+
+    def add_spectrum_entries(self, entries: list[dict]):
+        # Called by SelectionOfCyclesWindow after summation
+        self.data_entries.extend(entries)
         self._populate_individual_list()
         self.on_selection_changed()

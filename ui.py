@@ -24,17 +24,13 @@ class SpectraViewerUI:
         grp_list = QGroupBox("Spectra List")
         l_list = QVBoxLayout()
 
-        # Average selection
-        self.avg_cb   = QCheckBox("Average over range")
-        self.range_start = QSpinBox()
-        self.range_end   = QSpinBox()
-
         # Cam-A / Cam-B / Both radio row
         row = QHBoxLayout()
         self.radio_cam_a = QRadioButton("Cam. A")
         self.radio_cam_b = QRadioButton("Cam. B")
         self.radio_both  = QRadioButton("Both")
         self.radio_both.setChecked(True)
+        
         for rb in (self.radio_cam_a, self.radio_cam_b, self.radio_both):
             row.addWidget(rb)
         l_list.addLayout(row)
@@ -45,10 +41,7 @@ class SpectraViewerUI:
             QAbstractItemView.SelectionMode.ExtendedSelection
         )
         l_list.addWidget(self.indiv_list)
-        l_list.addWidget(self.avg_cb)
         l_list.addWidget(QLabel("Range of exported files:"))
-        l_list.addWidget(self.range_start)
-        l_list.addWidget(self.range_end)
         grp_list.setLayout(l_list)
         ctrl.addWidget(grp_list)
 

@@ -11,18 +11,17 @@ Each spectra goes in pairs since A and B camera output have different (slightly 
 
 To do:
 
-1.
-2. Add a toggle button to normalize by accomulation time.
-3. Add a button to remove fluorescence baseline with difuse function.
-4. Fix not working average by range by making time range instead.
-5. In UI, make time range to be a range slider.
-6. When exporting, add a radio button to export as two (prn) or as 3 column file (plt).
-7. Make a minimal functional export combined A and B function.
-8. If different modalities are not present disable the checkboxes.
-
-To get updated code:
+My code:
 """
 rm code.txt
-cat README.md > code.txt
-for i in \*.py; do cat $i >> code.txt; done
+cat README.md >> code.txt
+cat main.py >> code.txt
+cat ui.py >> code.txt
+cat window.py >> code.txt
+cat file_loader.py >> code.txt
+cat plotter.py >> code.txt
+cat data_processor.py >> code.txt
+cat baseline_manager.py >> code.txt
+cat exporter.py >> code.txt
+cat selection_cycles.py >> code.txt
 """

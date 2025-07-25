@@ -34,7 +34,7 @@ def load_data_files(directory):
         with open(path, 'r') as f:
             header = f.readline()
             info = parse_header(header)
-            df = pd.read_csv(f, delim_whitespace=True, names=[
+            df = pd.read_csv(f, sep=r'\s+', names=[
                 "Wavenumber", "SCP Raman", "SCP ROA",
                 "DCPI Raman", "DCPI ROA",
                 "DCPII Raman", "DCPII ROA",
