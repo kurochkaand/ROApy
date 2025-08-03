@@ -1,3 +1,4 @@
+# selection_cycles.py
 from PyQt6.QtWidgets import (
     QWidget, QSplitter, QListWidget, QListWidgetItem,
     QPushButton, QVBoxLayout, QHBoxLayout, QMessageBox
