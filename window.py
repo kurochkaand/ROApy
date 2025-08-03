@@ -189,7 +189,7 @@ class MainWindow(QMainWindow):
         export_separately(base,sel,mods)
         QMessageBox.information(
             self,"Export Separate",
-            f"Exported {2*len(sel)*len(mods)} files (…) to:\n{out_dir}"
+            f"Exported {2*len(sel)*len(mods)} files to:\n{out_dir}"
         )
 
     def _update_modalities(self):
