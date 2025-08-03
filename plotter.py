@@ -29,13 +29,14 @@ class SpectraPlotter:
         # plot each trace into the appropriate axis
         for entry in spectra_entries:
             df = entry["data"]
-            prefix = f"(Cam {entry['camera']})"
+            cam = f"(Cam. {entry['camera']})"
+            name = f"Cyc. {entry['file_index']}"
             for mod, (raman_col, roa_col) in modality_keys.items():
                 if modalities.get(mod):
                     # Raman on top
                     self.ax_raman.plot(
                         df["Wavenumber"], df[raman_col],
-                        label=f"{prefix} {mod}"
+                        label=f"{name} {cam} {mod}"
                     )
                     # ROA on bottom
                     self.ax_roa.plot(
