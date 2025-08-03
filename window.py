@@ -264,10 +264,6 @@ class MainWindow(QMainWindow):
             
     def on_create_baseline(self):
         sel = self._current_work_selection()
-        if not sel:
-            QMessageBox.warning(self, "Create Baseline", "No spectra selected.")
-            return
-
         params = BaselineParams(
             lam=1e5,
             p=self.ui.pressure_spin.value(),
@@ -285,14 +281,6 @@ class MainWindow(QMainWindow):
 
     def on_subtract_baseline(self):
         sel = self._current_work_selection()
-        if not sel:
-            QMessageBox.warning(self, "Subtract Background", "No spectra selected.")
-            return
-
-        if not self.baseline_mgr.has_any(sel):
-            QMessageBox.warning(self, "Subtract Background", "No baselines found. Please 'Create Baseline' first.")
-            return
-
         new_entries = []
         for e in sel:
             # Deep copy the spectrum entry (so we don't change the original)
