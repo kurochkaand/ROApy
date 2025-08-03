@@ -1,7 +1,7 @@
 # window.py
 import os
 from PyQt6.QtWidgets import QToolBar, QFileDialog, QMessageBox, QMainWindow, QCheckBox, QListWidgetItem
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtCore import QSettings, Qt
 import math
 from ui import SpectraViewerUI
@@ -16,6 +16,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Spectra Viewer")
+        self.setWindowIcon(QIcon("app_icon.ico")) 
         self.resize(900, 900)
         self.baseline_mgr = BaselineManager(self._uid_for_entry, baseline_als)
         self.normalized = False
