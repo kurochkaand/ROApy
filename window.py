@@ -1,7 +1,7 @@
 # window.py
 import os
-from PyQt6.QtWidgets import QToolBar, QFileDialog, QMessageBox, QMainWindow, QCheckBox, QListWidgetItem
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QMainWindow, QCheckBox, QListWidgetItem
+from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import QSettings, Qt
 import math
 from ui import SpectraViewerUI
@@ -20,11 +20,6 @@ class MainWindow(QMainWindow):
         self.resize(900, 900)
         self.baseline_mgr = BaselineManager(self._uid_for_entry, baseline_als)
         self.normalized = False
-        self.main_toolbar = QToolBar("Main")
-        self.addToolBar(self.main_toolbar)
-        self.select_cycles_action = QAction("Create selection of measurement cycles", self)
-        self.main_toolbar.addAction(self.select_cycles_action)
-        self.select_cycles_action.triggered.connect(self.open_selection_window)
 
         # Plotter instantiation
         self.plotter = SpectraPlotter(self)
@@ -32,6 +27,9 @@ class MainWindow(QMainWindow):
         # UI setup
         self.ui = SpectraViewerUI()
         self.ui.setup_ui(self, self.plotter)
+
+        # Connect the new button to opening selection window
+        self.ui.btn_create_selection.clicked.connect(self.open_selection_window)
 
         # Settings & directory
         self.ui.btn_subtract_created.setEnabled(False)

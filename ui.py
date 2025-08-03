@@ -41,7 +41,9 @@ class SpectraViewerUI:
             QAbstractItemView.SelectionMode.ExtendedSelection
         )
         l_list.addWidget(self.indiv_list)
-        l_list.addWidget(QLabel("Range of exported files:"))
+        self.btn_create_selection = QPushButton("Create selection of measurement cycles")
+        l_list.addWidget(self.btn_create_selection)
+
         grp_list.setLayout(l_list)
         ctrl.addWidget(grp_list)
 
