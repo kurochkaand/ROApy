@@ -66,9 +66,9 @@ class BaselineManager:
             self._cache[uid] = bas_dict
 
     def subtract(self,
-                 entries: Iterable[dict],
-                 from_zero: bool = True) -> None:
-        """Subtract cached/attached baselines from spectra in-place."""
+                entries: Iterable[dict],
+                from_zero: bool = True) -> None:
+        """Subtract cached/attached baselines from spectra in-place, then clear them so repeat subtract does nothing."""
         for e in entries:
             self._attach_cached_if_missing(e)
             bas = e.get("baselines", {})
@@ -79,9 +79,13 @@ class BaselineManager:
                 if col not in df.columns:
                     continue
                 y = df[col].to_numpy()
-                new_y = (y - z) if from_zero else (y - z + z.min())
+                if from_zero:
+                    new_y = y - z
+                else:
+                    new_y = y - z + z.min()
                 df[col] = new_y
-            # keep cache (baseline can be reused)
+            self.clear([e])
+
 
     def clear(self, entries: Iterable[dict] | None = None) -> None:
         """Remove baselines either globally or just for given entries."""
