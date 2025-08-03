@@ -34,6 +34,8 @@ class MainWindow(QMainWindow):
         self.ui.setup_ui(self, self.plotter)
 
         # Settings & directory
+        self.ui.btn_subtract_created.setEnabled(False)
+        self.ui.btn_delete_baseline.setEnabled(False)
         self.settings = QSettings("MyOrg", "SpectraViewer")
         last = self.settings.value("lastWorkingDir", os.getcwd())
         self.working_dir = QFileDialog.getExistingDirectory(
@@ -251,6 +253,7 @@ class MainWindow(QMainWindow):
         self.ui.meta_list.clear()
         for e in raw_sel:
             info = e['info']
+            self._update_baseline_buttons()
             num_cycles = info.get("num_cycles", "N/A")
             t = info.get("total_time")
             self.ui.meta_list.addItem(
@@ -278,8 +281,7 @@ class MainWindow(QMainWindow):
         # replot spectra, then overlay baselines
         self.plotter.update_plot(sel, mods)
         self.plotter.draw_baselines(sel)
-
-        QMessageBox.information(self, "Create Baseline", "Baseline(s) created and overlaid.")
+        self._update_baseline_buttons()
 
     def on_subtract_baseline(self):
         sel = self._current_work_selection()
@@ -312,15 +314,24 @@ class MainWindow(QMainWindow):
         self.data_entries.extend(new_entries)
         self._populate_individual_list()
         self.on_selection_changed()
-        QMessageBox.information(self, "Subtract Background", "Created baseline subtracted from spectra.")
+        self._update_baseline_buttons()
 
     def on_delete_baseline(self):
         self.baseline_mgr.clear()
         for e in self.data_entries:
             e.pop("baselines", None)
         self.on_selection_changed()
-        QMessageBox.information(self, "Delete Baseline", "Baselines cleared from the canvas.")
+        self._update_baseline_buttons()
 
+    def _update_baseline_buttons(self):
+        """
+        Enable the 'Subtract Baseline' and 'Delete Baseline' buttons
+        only if there is at least one baseline for the current selection.
+        """
+        sel = self._current_work_selection()
+        has_baseline = self.baseline_mgr.has_any(sel)
+        self.ui.btn_subtract_created.setEnabled(has_baseline)
+        self.ui.btn_delete_baseline.setEnabled(has_baseline)
 
     def _populate_individual_list(self):
         """List only cycle numbers, filtered by Cam A/B/Both."""
