@@ -121,8 +121,8 @@ class MainWindow(QMainWindow):
             lo, hi = entry['range']
             base = f"AVG::{entry['name']}::{entry['camera']}::{lo}-{hi}"
         else:
-            # real file spectrum
-            base = f"FILE::{entry.get('path', id(entry))}"
+            # real file spectrum — include camera so A vs B (or path=None duplicates) don’t collide
+            base = f"FILE::{entry.get('path', id(entry))}::Cam{entry.get('camera', '?')}"
         norm_flag = "1" if entry.get('__norm__', False) else "0"
         return f"{base}::norm={norm_flag}"
 
