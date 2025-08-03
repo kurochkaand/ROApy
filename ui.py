@@ -53,7 +53,7 @@ class SpectraViewerUI:
         self.mod_scp.setChecked(True)
 
         grp_mod = QGroupBox("Modalities")
-        l_mod = QVBoxLayout()
+        l_mod = QHBoxLayout()
         for cb in (self.mod_scp, self.mod_dcpi,
                    self.mod_dcpii, self.mod_scpc):
             l_mod.addWidget(cb)
