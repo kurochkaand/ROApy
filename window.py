@@ -7,7 +7,7 @@ import math
 from ui import SpectraViewerUI
 from file_loader import load_data_files
 from plotter import SpectraPlotter
-from data_processor import merge_a_b, average_spectra, baseline_als
+from data_processor import merge_a_b, baseline_als
 from baseline_manager import BaselineManager, BaselineParams
 from exporter import export_combined, export_separately
 from selection_cycles import SelectionOfCyclesWindow
