@@ -9,14 +9,14 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 import pandas as pd
 
 class SelectionOfCyclesWindow(QWidget):
-    def __init__(self, main_window):
+    def __init__(self, main_window, exp_name):
         super().__init__()
         self.main_window = main_window
+        self.exp_name = exp_name
         self.setWindowTitle("Selection of measurement cycles")
         self.resize(800, 600)
 
         # Filter entries for current experiment
-        exp_name = main_window.ui.exp_combo.currentText()
         entries = [e for e in main_window.data_entries if e['name'] == exp_name]
         # Group entries by cycle index
         self.cycles = {}  # cycle_index -> {'A': entryA, 'B': entryB}
@@ -218,7 +218,7 @@ class SelectionOfCyclesWindow(QWidget):
         sum_B = sum_dfs(deltas_B)
 
         # Build new spectrum entries
-        name = self.main_window.ui.exp_combo.currentText()
+        name = self.exp_name
         meta = {
             'num_cycles': cycles_per_file * n_sel,
             'gain': gain,

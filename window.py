@@ -1,6 +1,6 @@
 # window.py
 import os
-from PyQt6.QtWidgets import QFileDialog, QMessageBox, QMainWindow, QCheckBox, QListWidgetItem
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QMainWindow, QCheckBox, QTreeWidgetItem
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import QSettings, Qt
 import math
@@ -56,37 +56,20 @@ class MainWindow(QMainWindow):
             self.close(); return
 
         # Initial population & signals
-        self._populate_experiment_combo()
         self._update_modalities()
         self._populate_individual_list()
         self._connect_signals()
-
+        self._select_last_spectrum()
         self.on_selection_changed()
 
-    def _populate_experiment_combo(self):
-        names = sorted({e['name'] for e in self.data_entries})
-        self.ui.exp_combo.clear()
-        self.ui.exp_combo.addItems(names)
-        if names:
-            default = max(self.data_entries, key=lambda e: e['file_index'])['name']
-            idx = names.index(default)
-            self.ui.exp_combo.setCurrentIndex(idx)
-
     def get_selected_entries(self):
-        # Otherwise use explicit selection in the list
-        items = self.ui.indiv_list.selectedItems()
-        if not items and self.ui.indiv_list.count() > 0:
-            # Auto-select last row if nothing is selected
-            last_row = self.ui.indiv_list.count() - 1
-            self.ui.indiv_list.setCurrentRow(last_row)
-            items = [self.ui.indiv_list.item(last_row)]
-
+        items = self.ui.tree_list.selectedItems()
         selected = []
         for it in items:
-            raw = it.data(Qt.ItemDataRole.UserRole)
+            raw = it.data(0, Qt.ItemDataRole.UserRole)
             if isinstance(raw, list):
                 selected.extend(raw)
-            else:
+            elif raw:
                 selected.append(raw)
         return selected
 
@@ -131,7 +114,6 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self):
         ui = self.ui
-        ui.exp_combo.currentIndexChanged.connect(self._on_experiment_changed)
         for w in (ui.mod_scp, ui.mod_dcpi, ui.mod_dcpii, ui.mod_scpc):
             w.stateChanged.connect(self.on_selection_changed)
         for rb in (ui.radio_cam_a, ui.radio_cam_b, ui.radio_both):
@@ -142,7 +124,7 @@ class MainWindow(QMainWindow):
         ui.btn_create_baseline.clicked.connect(self.on_create_baseline)
         ui.btn_subtract_created.clicked.connect(self.on_subtract_baseline)
         ui.btn_delete_baseline.clicked.connect(self.on_delete_baseline)
-        ui.indiv_list.itemSelectionChanged.connect(self.on_selection_changed)
+        ui.tree_list.itemSelectionChanged.connect(self.on_selection_changed)
 
     def _on_experiment_changed(self):
         self._update_modalities()
@@ -194,35 +176,25 @@ class MainWindow(QMainWindow):
 
     def _update_modalities(self):
         """
-        Enable/disable each modality checkbox based on whether the FIRST
-        data point in that modality is non-zero—treating NaN or missing
-        as zero.
+        Enable/disable each modality checkbox based on whether any data entry
+        contains non-zero values for that modality.
         """
-        name = self.ui.exp_combo.currentText()
-        if not name:
-            return
-        entries = [e for e in self.data_entries if e['name'] == name]
+        entries = self.data_entries
         modality_info = {
             'DCPI':  ('mod_dcpi',  "DCPI Raman",  "DCPI ROA"),
             'DCPII': ('mod_dcpii', "DCPII Raman", "DCPII ROA"),
             'SCPc':  ('mod_scpc',  "SCPc Raman",  "SCPc ROA")
         }
+
         for mod, (attr, r_col, o_col) in modality_info.items():
             cb: QCheckBox = getattr(self.ui, attr)
             present = False
             for e in entries:
                 df = e['data']
-                if len(df) > 0 and r_col in df.columns:
-                    r0 = df[r_col].iat[0]
-                    if math.isnan(r0): r0 = 0
-                else:
-                    r0 = 0
-                if len(df) > 0 and o_col in df.columns:
-                    o0 = df[o_col].iat[0]
-                    if math.isnan(o0): o0 = 0
-                else:
-                    o0 = 0
-                if r0 != 0 or o0 != 0:
+                if r_col in df.columns and not df[r_col].isna().all() and df[r_col].any():
+                    present = True
+                    break
+                if o_col in df.columns and not df[o_col].isna().all() and df[o_col].any():
                     present = True
                     break
             cb.setEnabled(present)
@@ -322,50 +294,48 @@ class MainWindow(QMainWindow):
         self.ui.btn_delete_baseline.setEnabled(has_baseline)
 
     def _populate_individual_list(self):
-        """List only cycle numbers, filtered by Cam A/B/Both."""
-        self.ui.indiv_list.clear()
-        name = self.ui.exp_combo.currentText()
-        entries = [e for e in self.data_entries if e['name']==name]
+        self.ui.tree_list.clear()
+        cam_mode = (
+            'A' if self.ui.radio_cam_a.isChecked() else
+            'B' if self.ui.radio_cam_b.isChecked() else
+            'Both'
+        )
 
-        # group by cycle → cameras
-        by_cycle = {}
-        for e in entries:
-            by_cycle.setdefault(e['file_index'], {})[e['camera']] = e
+        # Group by experiment name
+        by_experiment = {}
+        for entry in self.data_entries:
+            by_experiment.setdefault(entry['name'], []).append(entry)
 
-        # decide mode
-        if self.ui.radio_cam_a.isChecked():
-            mode = 'A'
-        elif self.ui.radio_cam_b.isChecked():
-            mode = 'B'
-        else:
-            mode = 'Both'
+        for exp_name, entries in sorted(by_experiment.items()):
+            exp_item = QTreeWidgetItem([exp_name])
+            exp_item.setFlags(exp_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)  # make experiment unselectable
 
-        def cycle_sort_key(c):
-            # ints sort before strings, and ints sort numerically
-            return (isinstance(c, str), c)
-        for cycle in sorted(by_cycle, key=cycle_sort_key):
-            cams = by_cycle[cycle]
-            if mode in ('A','B'):
-                if mode not in cams:
-                    continue
-                data = cams[mode]
-            else:  # Both
-                if 'A' not in cams or 'B' not in cams:
-                    continue
-                data = [cams['A'], cams['B']]
+            # Group entries by file_index (cycle)
+            by_cycle = {}
+            for e in entries:
+                by_cycle.setdefault(e['file_index'], {})[e['camera']] = e
 
-            item = QListWidgetItem(f"Cycle {cycle}")
-            # store either a single entry or a list of two
-            item.setData(Qt.ItemDataRole.UserRole, data)
-            self.ui.indiv_list.addItem(item)
-        # Automatically select the last cycle in the list
-        self.ui.indiv_list.clearSelection()
-        count = self.ui.indiv_list.count()
-        if count > 0:
-            last_item = self.ui.indiv_list.item(count - 1)
-            last_item.setSelected(True)
-        if count:
-            self.ui.indiv_list.setCurrentRow(count - 1)
+            def _cycle_sort_key(cycle):
+                # Sort integers numerically first, then strings alphabetically
+                return (isinstance(cycle, str), cycle)
+
+            for cycle, cams in sorted(by_cycle.items(), key=lambda item: _cycle_sort_key(item[0])):
+                if cam_mode in ('A', 'B'):
+                    if cam_mode not in cams:
+                        continue
+                    data = cams[cam_mode]
+                else:  # Both
+                    if 'A' not in cams or 'B' not in cams:
+                        continue
+                    data = [cams['A'], cams['B']]
+
+                item = QTreeWidgetItem([f"Cycle {cycle}"])
+                item.setData(0, Qt.ItemDataRole.UserRole, data)
+                exp_item.addChild(item)
+
+            if exp_item.childCount() > 0:
+                self.ui.tree_list.addTopLevelItem(exp_item)
+                exp_item.setExpanded(True)
 
     def _on_camera_mode_changed(self):
         self._populate_individual_list()
@@ -377,7 +347,9 @@ class MainWindow(QMainWindow):
             self.selection_window.raise_()
             self.selection_window.activateWindow()
         else:
-            self.selection_window = SelectionOfCyclesWindow(self)
+            sel = self.get_selected_entries()
+            exp_name = sel[0]["name"] if sel else None
+            self.selection_window = SelectionOfCyclesWindow(self, exp_name)
             self.selection_window.show()
 
     def add_spectrum_entries(self, entries: list[dict]):
@@ -385,6 +357,19 @@ class MainWindow(QMainWindow):
         self.data_entries.extend(entries)
         self._populate_individual_list()
         self.on_selection_changed()
+    def _select_last_spectrum(self):
+        tree = self.ui.tree_list
+        # no experiments? bail
+        if tree.topLevelItemCount() == 0:
+            return
+        # pick the last experiment node
+        last_exp = tree.topLevelItem(tree.topLevelItemCount() - 1)
+        if last_exp.childCount() == 0:
+            return
+        # pick its last cycle
+        last_cycle = last_exp.child(last_exp.childCount() - 1)
+        tree.setCurrentItem(last_cycle)      # focus
+        last_cycle.setSelected(True)         # actually select
 
     def on_add_working_dir(self):
         """Prompt for another directory and merge its data entries (skipping already-loaded files)."""
@@ -418,7 +403,6 @@ class MainWindow(QMainWindow):
         self.settings.setValue("lastWorkingDir", new_dir)
 
         # Refresh UI/state
-        self._populate_experiment_combo()
         self._update_modalities()
         self._populate_individual_list()
         self.on_selection_changed()

@@ -1,8 +1,8 @@
 # ui.py
 from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QComboBox,
+    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QTreeWidget, 
     QCheckBox, QGroupBox, QSpinBox, QPushButton, QListWidget,
-    QDoubleSpinBox, QRadioButton, QFormLayout, QAbstractItemView, QSpinBox
+    QDoubleSpinBox, QRadioButton, QFormLayout, QAbstractItemView
 )
 
 class SpectraViewerUI:
@@ -19,11 +19,6 @@ class SpectraViewerUI:
         self.btn_add_working_dir.setToolTip("Load spectra from an additional working directory (merges with current).")
         ctrl.addWidget(self.btn_add_working_dir)
 
-        # Experiment selector
-        ctrl.addWidget(QLabel("Experiment"))
-        self.exp_combo = QComboBox()
-        ctrl.addWidget(self.exp_combo)
-
         # Individual‐spectrum selector
         grp_list = QGroupBox("Spectra List")
         l_list = QVBoxLayout()
@@ -39,12 +34,21 @@ class SpectraViewerUI:
             row.addWidget(rb)
         l_list.addLayout(row)
 
-        self.indiv_list = QListWidget()
-        # allow multiple selection
-        self.indiv_list.setSelectionMode(
-            QAbstractItemView.SelectionMode.ExtendedSelection
-        )
-        l_list.addWidget(self.indiv_list)
+        # Tree list of spectra
+        hint = QLabel("Press CTRL for multiple selection.")
+        # make it slightly smaller / subdued if you want
+        font = hint.font()
+        font.setPointSize(font.pointSize() - 1)
+        hint.setFont(font)
+        hint.setStyleSheet("color: gray;")
+        l_list.addWidget(hint)
+
+        # Tree list of spectra
+        self.tree_list = QTreeWidget()
+        self.tree_list.setHeaderHidden(True)
+        self.tree_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        l_list.addWidget(self.tree_list)
+
         self.btn_create_selection = QPushButton("Create selection of measurement cycles")
         l_list.addWidget(self.btn_create_selection)
 
@@ -77,7 +81,7 @@ class SpectraViewerUI:
         ctrl.addWidget(self.btn_toggle_norm)
 
         # Fluorescence background removal
-        grp_bg = QGroupBox("Fluorescence Removal")
+        grp_bg = QGroupBox("Raman Baseline Removal")
         form = QFormLayout()
 
         self.max_iter_spin = QSpinBox()
@@ -110,9 +114,9 @@ class SpectraViewerUI:
 
 
         # new baseline‐related buttons
-        self.btn_create_baseline       = QPushButton("Create Baseline")
-        self.btn_subtract_created      = QPushButton("Subtract Baseline")
-        self.btn_delete_baseline       = QPushButton("Delete Baseline")
+        self.btn_create_baseline       = QPushButton("Create")
+        self.btn_subtract_created      = QPushButton("Subtract")
+        self.btn_delete_baseline       = QPushButton("Delete")
         form.addRow(self.btn_create_baseline)
         form.addRow(self.btn_subtract_created)
         form.addRow(self.btn_delete_baseline)
