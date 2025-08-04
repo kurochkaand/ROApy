@@ -2,7 +2,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QComboBox,
     QCheckBox, QGroupBox, QSpinBox, QPushButton, QListWidget,
-    QDoubleSpinBox, QRadioButton, QFormLayout, QAbstractItemView,
+    QDoubleSpinBox, QRadioButton, QFormLayout, QAbstractItemView, QSpinBox
 )
 
 class SpectraViewerUI:
@@ -98,11 +98,12 @@ class SpectraViewerUI:
         form.addRow("Mode:", h)
 
         # starting wavenumber for baseline
-        self.start_wav_spin = QDoubleSpinBox()
+        self.start_wav_spin = QSpinBox()
         self.start_wav_spin.setRange(-50, 4000)
-        self.start_wav_spin.setValue(100.0)
+        self.start_wav_spin.setValue(100)
         self.start_wav_spin.setSuffix(" cm⁻¹")
-        form.addRow("Baseline start (cm⁻¹):", self.start_wav_spin)
+        form.addRow("Baseline start:", self.start_wav_spin)
+
 
         # new baseline‐related buttons
         self.btn_create_baseline       = QPushButton("Create Baseline")
