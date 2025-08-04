@@ -98,13 +98,6 @@ class SpectraViewerUI:
         form.addRow("Pressure (scaled):", self.pressure_spin)
 
         # baseline mode radio buttons
-        self.radio_zero     = QRadioButton("From zero")
-        self.radio_spectrum = QRadioButton("To spectrum")
-        self.radio_zero.setChecked(True)
-        h = QHBoxLayout()
-        h.addWidget(self.radio_zero)
-        h.addWidget(self.radio_spectrum)
-        form.addRow("Mode:", h)
 
         # starting wavenumber for baseline
         self.start_wav_spin = QSpinBox()

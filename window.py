@@ -11,6 +11,7 @@ from data_processor import merge_a_b, baseline_als
 from baseline_manager import BaselineManager, BaselineParams
 from exporter import export_combined, export_separately
 from selection_cycles import SelectionOfCyclesWindow
+import copy
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -256,10 +257,9 @@ class MainWindow(QMainWindow):
         new_entries = []
         for e in sel:
             # Deep copy the spectrum entry (so we don't change the original)
-            import copy
             new_entry = copy.deepcopy(e)
             # Actually subtract the baseline on the copy
-            self.baseline_mgr.subtract([new_entry], from_zero=self.ui.radio_zero.isChecked())
+            self.baseline_mgr.subtract([new_entry])
             # Modify the name/file_index to indicate baseline-corrected
             old_name = new_entry.get('name', '')
             old_index = new_entry.get('file_index', '')
