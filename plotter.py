@@ -4,6 +4,7 @@ from matplotlib.backends.backend_qtagg import (
     NavigationToolbar2QT
 )
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 
 class SlimToolbar(NavigationToolbar2QT):
     # filter the toolitems to just the ones we want
@@ -81,7 +82,27 @@ class SpectraPlotter:
 
         # legends (only if there are lines)
         if self.ax_raman.lines:
-            self.ax_raman.legend(loc="upper right", fontsize="small")
+            # remove any existing legend
+            self.ax_raman.legend_.remove() if getattr(self.ax_raman, "legend_", None) else None
+
+            all_lines = self.ax_raman.get_lines()
+            all_labels = [l.get_label() for l in all_lines]
+            total = len(all_labels)
+
+            if total > 15:
+                # show first 5 plus a "+N more" proxy label
+                show_n = 5
+                displayed_handles = all_lines[:show_n]
+                displayed_labels = all_labels[:show_n]
+                more_count = total - show_n
+                proxy = Line2D([], [], linestyle="", label=f"+{more_count} more")
+                handles = displayed_handles + [proxy]
+                labels = displayed_labels + [proxy.get_label()]
+                self.ax_raman.legend(handles=handles, labels=labels,
+                                    loc="upper right", fontsize="small", frameon=True)
+            else:
+                # normal full legend
+                self.ax_raman.legend(loc="upper right", fontsize="small", frameon=True)
 
         # tighten up spacing so labels don’t overlap
         self.figure.tight_layout()
