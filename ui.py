@@ -2,7 +2,8 @@
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QTreeWidget, 
     QCheckBox, QGroupBox, QSpinBox, QPushButton, QListWidget,
-    QDoubleSpinBox, QRadioButton, QFormLayout, QAbstractItemView
+    QDoubleSpinBox, QRadioButton, QFormLayout, QAbstractItemView,
+    QSizePolicy
 )
 
 class SpectraViewerUI:
@@ -80,7 +81,7 @@ class SpectraViewerUI:
         self.btn_toggle_norm = QPushButton("Normalize by TotalTime")
         ctrl.addWidget(self.btn_toggle_norm)
 
-        # Fluorescence background removal
+        # Raman Baseline removal
         grp_bg = QGroupBox("Raman Baseline Removal")
         form = QFormLayout()
 
@@ -117,10 +118,16 @@ class SpectraViewerUI:
         self.btn_create_baseline       = QPushButton("Create")
         self.btn_subtract_created      = QPushButton("Subtract")
         self.btn_delete_baseline       = QPushButton("Delete")
-        form.addRow(self.btn_create_baseline)
-        form.addRow(self.btn_subtract_created)
-        form.addRow(self.btn_delete_baseline)
-        
+        for btn in (self.btn_create_baseline, self.btn_subtract_created, self.btn_delete_baseline):
+            btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(8)
+        buttons_layout.addWidget(self.btn_create_baseline)
+        buttons_layout.addWidget(self.btn_subtract_created)
+        buttons_layout.addWidget(self.btn_delete_baseline)
+        form.addRow("", buttons_layout)  # empty label so buttons span the row
+
         grp_bg.setLayout(form)
         ctrl.addWidget(grp_bg)
 
