@@ -47,11 +47,16 @@ class SpectraPlotter:
             "SCPc":  ("SCPc Raman", "SCPc ROA")
         }
 
+        def _truncate(value, max_len=10):
+            s = str(value)
+            return s if len(s) <= max_len else s[:max_len] + "..."
+
         # plot each trace into the appropriate axis
         for entry in spectra_entries:
             df = entry["data"]
             cam = f"(Cam. {entry['camera']})"
-            name = f"Cyc. {entry['file_index']}"
+            truncated_index = _truncate(entry["file_index"], 20)
+            name = f"Cyc. {truncated_index}"
             for mod, (raman_col, roa_col) in modality_keys.items():
                 if modalities.get(mod):
                     # Raman on top
@@ -63,6 +68,7 @@ class SpectraPlotter:
                     self.ax_roa.plot(
                         df["Wavenumber"], df[roa_col],
                     )
+
 
         # annotate axes
         self.ax_raman.set_ylabel("Raman Intensity")
