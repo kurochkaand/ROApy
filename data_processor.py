@@ -21,37 +21,45 @@ def baseline_als(
     lam: float = 1e5,
     p: float = 0.01,
     niter: int = 10,
+    tol: float = 1e-6,             # relative convergence tolerance on ||Δz|| / ||z||
+    min_delta: float = 0.0,       # absolute minimum change to consider (optional)
     redraw_each: int = None,
     callback=None
 ) -> np.ndarray:
     """
     Eilers & Boelens Asymmetric Least Squares baseline.
-
-    Parameters
-    ----------
-    y : raw intensity array
-    lam : smoothness parameter (higher → smoother baseline)
-    p : asymmetry parameter (0 - 1, typical 1e-4 - 1e-2)
-    niter : max iterations
-    redraw_each : if provided, every redraw_each iterations invokes callback(i, baseline)
-    callback : function(iteration, baseline_array)
-
-    Returns
-    -------
-    baseline z as an array of same shape as y
+    Stops early if the change in baseline is below tolerance.
     """
     L = len(y)
-    # second‐difference matrix
     D = diags([1, -2, 1], [0, -1, -2], shape=(L, L-2))
     D = lam * (D @ D.T)
     w = np.ones(L)
+    last_z = np.zeros_like(y)
+    last_z_norm = np.linalg.norm(last_z)
+    eps = 1e-8
     for i in range(niter):
         W = diags(w, 0)
         Z = W + D
-        # convert to CSC (or .tocsr()) to avoid SparseEfficiencyWarning
-        Z = Z.tocsc()
-        z = spsolve(Z, w * y)
-        w = p * (y > z) + (1 - p) * (y < z)
+        try:
+            Z = Z.tocsc()
+            rhs = w * y
+            z = spsolve(Z, rhs)
+        except Exception as exc:
+            z = last_z.copy()
+        z_norm = np.linalg.norm(z)
+
+        w_new = np.where(y > z, p, 1 - p)
+        w = np.clip(w_new, eps, 1 - eps)
         if callback and redraw_each and (i % redraw_each == 0):
             callback(i, z)
-    return z
+        if i > 0:
+            delta_z = np.linalg.norm(z - last_z)
+            rel_change = delta_z / (last_z_norm + eps)
+            if (rel_change < tol) or (delta_z < min_delta):
+                print(f"Convergence reached at iteration {i+1}")
+                last_z = z.copy()
+                break
+        last_z = z.copy()
+        last_z_norm = z_norm
+    return last_z
+
