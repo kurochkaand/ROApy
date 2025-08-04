@@ -210,7 +210,7 @@ class MainWindow(QMainWindow):
         if self.normalized:
             self.ui.btn_toggle_norm.setText("Undo normalization")
         else:
-            self.ui.btn_toggle_norm.setText("Normalize by TotalTime")
+            self.ui.btn_toggle_norm.setText("Normalize by Accumulation Time")
         self.on_selection_changed()
 
     def on_selection_changed(self):

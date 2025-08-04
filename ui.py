@@ -52,6 +52,8 @@ class SpectraViewerUI:
 
         self.btn_create_selection = QPushButton("Create selection of measurement cycles")
         l_list.addWidget(self.btn_create_selection)
+        self.btn_toggle_norm = QPushButton("Normalize by Accumulation Time")
+        l_list.addWidget(self.btn_toggle_norm)
 
         grp_list.setLayout(l_list)
         ctrl.addWidget(grp_list)
@@ -76,10 +78,6 @@ class SpectraViewerUI:
         self.btn_export_sep  = QPushButton("Export Separate")
         ctrl.addWidget(self.btn_export_comb)
         ctrl.addWidget(self.btn_export_sep)
-
-        # Normalization toggle
-        self.btn_toggle_norm = QPushButton("Normalize by TotalTime")
-        ctrl.addWidget(self.btn_toggle_norm)
 
         # Raman Baseline removal
         grp_bg = QGroupBox("Raman Baseline Removal")
