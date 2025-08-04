@@ -1,16 +1,20 @@
 # plotter.py
 from matplotlib.backends.backend_qtagg import (
     FigureCanvasQTAgg as FigureCanvas,
-    NavigationToolbar2QT as NavigationToolbar
+    NavigationToolbar2QT
 )
 from matplotlib.figure import Figure
+
+class SlimToolbar(NavigationToolbar2QT):
+    # filter the toolitems to just the ones we want
+    toolitems = [ti for ti in NavigationToolbar2QT.toolitems if ti[0] in ("Home", "Back", "Save")]
 
 class SpectraPlotter:
     def __init__(self, parent):
         # create figure with two rows, shared X
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
-        self.toolbar = NavigationToolbar(self.canvas, self.canvas)
+        self.toolbar = SlimToolbar(self.canvas, self.canvas)
         self.ax_raman = self.figure.add_subplot(211)
         self.ax_roa   = self.figure.add_subplot(212, sharex=self.ax_raman)
 
