@@ -91,11 +91,11 @@ class SpectraViewerUI:
         form.addRow("Max iterations:", self.max_iter_spin)
 
         self.pressure_spin = QDoubleSpinBox()
-        self.pressure_spin.setDecimals(8)
-        self.pressure_spin.setRange(0.0, 1.0)
-        self.pressure_spin.setSingleStep(1e-5)
-        self.pressure_spin.setValue(1e-5)
-        form.addRow("Pressure (p):", self.pressure_spin)
+        self.pressure_spin.setDecimals(1)
+        self.pressure_spin.setRange(0.0, 10.0)
+        self.pressure_spin.setSingleStep(1e-1)
+        self.pressure_spin.setValue(1e-1)
+        form.addRow("Pressure (scaled):", self.pressure_spin)
 
         # baseline mode radio buttons
         self.radio_zero     = QRadioButton("From zero")

@@ -238,7 +238,7 @@ class MainWindow(QMainWindow):
         sel = self._current_work_selection()
         params = BaselineParams(
             lam=1e5,
-            p=self.ui.pressure_spin.value(),
+            p=self.ui.pressure_spin.value()*1e-4,
             niter=self.ui.max_iter_spin.value(),
             start_wavenumber=self.ui.start_wav_spin.value()
         )
