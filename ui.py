@@ -15,6 +15,10 @@ class SpectraViewerUI:
         ctrl = QVBoxLayout()
         main_l.addLayout(ctrl, 1)
 
+        self.btn_add_working_dir = QPushButton("Add Working Directory")
+        self.btn_add_working_dir.setToolTip("Load spectra from an additional working directory (merges with current).")
+        ctrl.addWidget(self.btn_add_working_dir)
+
         # Experiment selector
         ctrl.addWidget(QLabel("Experiment"))
         self.exp_combo = QComboBox()

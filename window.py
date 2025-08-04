@@ -27,6 +27,8 @@ class MainWindow(QMainWindow):
         # UI setup
         self.ui = SpectraViewerUI()
         self.ui.setup_ui(self, self.plotter)
+        self.ui.btn_create_selection.clicked.connect(self.open_selection_window)
+        self.ui.btn_add_working_dir.clicked.connect(self.on_add_working_dir)
 
         # Connect the new button to opening selection window
         self.ui.btn_create_selection.clicked.connect(self.open_selection_window)
@@ -381,5 +383,42 @@ class MainWindow(QMainWindow):
     def add_spectrum_entries(self, entries: list[dict]):
         # Called by SelectionOfCyclesWindow after summation
         self.data_entries.extend(entries)
+        self._populate_individual_list()
+        self.on_selection_changed()
+
+    def on_add_working_dir(self):
+        """Prompt for another directory and merge its data entries (skipping already-loaded files)."""
+        last = self.settings.value("lastWorkingDir", os.getcwd())
+        new_dir = QFileDialog.getExistingDirectory(
+            self, "Select Additional Working Directory", last,
+            QFileDialog.Option.ShowDirsOnly
+        )
+        if not new_dir:
+            return
+
+        new_entries = load_data_files(new_dir)
+        if not new_entries:
+            QMessageBox.warning(
+                self, "No Data",
+                f"No valid spectra files found in:\n{new_dir}"
+            )
+            return
+
+        # Filter out duplicates based on path
+        existing_paths = {e.get("path") for e in self.data_entries}
+        added = [e for e in new_entries if e.get("path") not in existing_paths]
+        if not added:
+            QMessageBox.information(
+                self, "Add Working Directory",
+                "All spectra from the selected directory are already loaded."
+            )
+            return
+
+        self.data_entries.extend(added)
+        self.settings.setValue("lastWorkingDir", new_dir)
+
+        # Refresh UI/state
+        self._populate_experiment_combo()
+        self._update_modalities()
         self._populate_individual_list()
         self.on_selection_changed()
