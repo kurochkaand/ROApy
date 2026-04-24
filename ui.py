@@ -16,9 +16,20 @@ class SpectraViewerUI:
         ctrl = QVBoxLayout()
         main_l.addLayout(ctrl, 1)
 
+        dir_row = QHBoxLayout()
         self.btn_add_working_dir = QPushButton("Add Working Directory")
         self.btn_add_working_dir.setToolTip("Load spectra from an additional working directory (merges with current).")
-        ctrl.addWidget(self.btn_add_working_dir)
+        dir_row.addWidget(self.btn_add_working_dir)
+
+        self.btn_refresh_working_dirs = QPushButton("Refresh")
+        self.btn_refresh_working_dirs.setToolTip("Scan all loaded working directories for newly added spectra files.")
+        dir_row.addWidget(self.btn_refresh_working_dirs)
+
+        self.btn_clear_all = QPushButton("Clear All")
+        self.btn_clear_all.setToolTip("Clear loaded spectra and start over from a new working directory.")
+        dir_row.addWidget(self.btn_clear_all)
+
+        ctrl.addLayout(dir_row)
 
         # Individual‐spectrum selector
         grp_list = QGroupBox("Spectra List")
