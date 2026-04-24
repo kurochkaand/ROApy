@@ -30,6 +30,8 @@ class MainWindow(QMainWindow):
         self.ui.setup_ui(self, self.plotter)
         self.ui.btn_create_selection.clicked.connect(self.open_selection_window)
         self.ui.btn_add_working_dir.clicked.connect(self.on_add_working_dir)
+        self.ui.btn_refresh_working_dirs.clicked.connect(self.on_refresh_working_dirs)
+        self.ui.btn_clear_all.clicked.connect(self.on_clear_all)
 
         # Connect the new button to opening selection window
         self.ui.btn_create_selection.clicked.connect(self.open_selection_window)
@@ -39,13 +41,14 @@ class MainWindow(QMainWindow):
         self.ui.btn_delete_baseline.setEnabled(False)
         self.settings = QSettings("MyOrg", "SpectraViewer")
         last = self.settings.value("lastWorkingDir", os.getcwd())
-        self.working_dir = QFileDialog.getExistingDirectory(
-            self, "Select Working Directory", last,
-            QFileDialog.Option.ShowDirsOnly
+        self.working_dir = self._select_working_directory(
+            title="Select Working Directory",
+            initial_dir=last
         )
         if not self.working_dir:
             self.close(); return
         self.settings.setValue("lastWorkingDir", self.working_dir)
+        self.loaded_working_dirs = [self.working_dir]
 
         # Load data
         self.data_entries = load_data_files(self.working_dir)
@@ -374,9 +377,9 @@ class MainWindow(QMainWindow):
     def on_add_working_dir(self):
         """Prompt for another directory and merge its data entries (skipping already-loaded files)."""
         last = self.settings.value("lastWorkingDir", os.getcwd())
-        new_dir = QFileDialog.getExistingDirectory(
-            self, "Select Additional Working Directory", last,
-            QFileDialog.Option.ShowDirsOnly
+        new_dir = self._select_working_directory(
+            title="Select Additional Working Directory",
+            initial_dir=last
         )
         if not new_dir:
             return
@@ -401,8 +404,110 @@ class MainWindow(QMainWindow):
 
         self.data_entries.extend(added)
         self.settings.setValue("lastWorkingDir", new_dir)
+        if new_dir not in self.loaded_working_dirs:
+            self.loaded_working_dirs.append(new_dir)
 
         # Refresh UI/state
         self._update_modalities()
         self._populate_individual_list()
         self.on_selection_changed()
+
+    def on_refresh_working_dirs(self):
+        """
+        Reload all known working directories and import only newly discovered files.
+        """
+        if not getattr(self, "loaded_working_dirs", None):
+            QMessageBox.information(
+                self, "Refresh Working Directories",
+                "No working directories are currently loaded."
+            )
+            return
+
+        existing_paths = {e.get("path") for e in self.data_entries}
+        added_total = 0
+
+        for work_dir in self.loaded_working_dirs:
+            new_entries = load_data_files(work_dir)
+            added = [e for e in new_entries if e.get("path") not in existing_paths]
+            if added:
+                self.data_entries.extend(added)
+                existing_paths.update(e.get("path") for e in added)
+                added_total += len(added)
+
+        if added_total == 0:
+            QMessageBox.information(
+                self, "Refresh Working Directories",
+                "No new spectra files were found."
+            )
+            return
+
+        self._update_modalities()
+        self._populate_individual_list()
+        self.on_selection_changed()
+        QMessageBox.information(
+            self, "Refresh Working Directories",
+            f"Loaded {added_total} new spectra files."
+        )
+
+    def on_clear_all(self):
+        """
+        Clear all loaded data and restart from a freshly selected working directory.
+        """
+        confirm = QMessageBox.question(
+            self, "Clear All",
+            "This will remove all loaded spectra and baselines. Continue?"
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+
+        self.data_entries = []
+        self.loaded_working_dirs = []
+        self.baseline_mgr.clear()
+        self.ui.tree_list.clear()
+        self.ui.meta_list.clear()
+        self.plotter.update_plot([], self.get_modalities())
+        self._update_baseline_buttons()
+
+        last = self.settings.value("lastWorkingDir", os.getcwd())
+        new_dir = self._select_working_directory(
+            title="Select Working Directory",
+            initial_dir=last
+        )
+        if not new_dir:
+            QMessageBox.information(
+                self, "Clear All",
+                "All loaded data was cleared. Select a working directory to load new spectra."
+            )
+            return
+
+        new_entries = load_data_files(new_dir)
+        if not new_entries:
+            QMessageBox.warning(
+                self, "No Data",
+                f"No valid spectra files found in:\n{new_dir}"
+            )
+            return
+
+        self.data_entries = new_entries
+        self.loaded_working_dirs = [new_dir]
+        self.working_dir = new_dir
+        self.settings.setValue("lastWorkingDir", new_dir)
+        self._update_modalities()
+        self._populate_individual_list()
+        self._select_last_spectrum()
+        self.on_selection_changed()
+
+    def _select_working_directory(self, title: str, initial_dir: str) -> str:
+        """
+        Open a directory-picker dialog that also shows directory contents.
+        """
+        dialog = QFileDialog(self, title, initial_dir)
+        dialog.setFileMode(QFileDialog.FileMode.Directory)
+        dialog.setOption(QFileDialog.Option.ShowDirsOnly, False)
+        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+        dialog.setNameFilter("Text files (*.txt);;All files (*)")
+        dialog.setViewMode(QFileDialog.ViewMode.Detail)
+        if dialog.exec():
+            selected = dialog.selectedFiles()
+            return selected[0] if selected else ""
+        return ""
