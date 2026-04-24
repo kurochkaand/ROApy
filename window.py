@@ -39,9 +39,9 @@ class MainWindow(QMainWindow):
         self.ui.btn_delete_baseline.setEnabled(False)
         self.settings = QSettings("MyOrg", "SpectraViewer")
         last = self.settings.value("lastWorkingDir", os.getcwd())
-        self.working_dir = QFileDialog.getExistingDirectory(
-            self, "Select Working Directory", last,
-            QFileDialog.Option.ShowDirsOnly
+        self.working_dir = self._select_working_directory(
+            title="Select Working Directory",
+            initial_dir=last
         )
         if not self.working_dir:
             self.close(); return
@@ -374,9 +374,9 @@ class MainWindow(QMainWindow):
     def on_add_working_dir(self):
         """Prompt for another directory and merge its data entries (skipping already-loaded files)."""
         last = self.settings.value("lastWorkingDir", os.getcwd())
-        new_dir = QFileDialog.getExistingDirectory(
-            self, "Select Additional Working Directory", last,
-            QFileDialog.Option.ShowDirsOnly
+        new_dir = self._select_working_directory(
+            title="Select Additional Working Directory",
+            initial_dir=last
         )
         if not new_dir:
             return
@@ -406,3 +406,18 @@ class MainWindow(QMainWindow):
         self._update_modalities()
         self._populate_individual_list()
         self.on_selection_changed()
+
+    def _select_working_directory(self, title: str, initial_dir: str) -> str:
+        """
+        Open a directory-picker dialog that also shows directory contents.
+        """
+        dialog = QFileDialog(self, title, initial_dir)
+        dialog.setFileMode(QFileDialog.FileMode.Directory)
+        dialog.setOption(QFileDialog.Option.ShowDirsOnly, False)
+        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+        dialog.setNameFilter("Text files (*.txt);;All files (*)")
+        dialog.setViewMode(QFileDialog.ViewMode.Detail)
+        if dialog.exec():
+            selected = dialog.selectedFiles()
+            return selected[0] if selected else ""
+        return ""
